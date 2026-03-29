@@ -159,39 +159,78 @@ export default function DashboardPage() {
     return pts
   }, [showLayers, activeSections])
 
-  const counts = useMemo(() => ({
-    bh: filteredPoints.filter(p => p.type === 'BH').length,
-    cpt: filteredPoints.filter(p => p.type === 'CPT').length,
-    plt: filteredPoints.filter(p => p.type === 'PLT').length,
-  }), [filteredPoints])
+  const counts = useMemo(() => {
+    const bh = filteredPoints.filter(p => p.type === 'BH')
+    const cpt = filteredPoints.filter(p => p.type === 'CPT')
+    const plt = filteredPoints.filter(p => p.type === 'PLT')
+    
+    return {
+      bh: bh.length,
+      bhCompleted: bh.filter(p => p.status === 'completed').length,
+      cpt: cpt.length,
+      cptCompleted: cpt.filter(p => p.status === 'completed').length,
+      plt: plt.length,
+      pltCompleted: plt.filter(p => p.status === 'completed').length,
+      metersPlanned: filteredPoints.reduce((sum, p) => sum + p.targetDepth, 0),
+      metersCompleted: filteredPoints.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.targetDepth, 0)
+    }
+  }, [filteredPoints])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* KPI Header */}
       <section className="grid grid-cols-5 gap-3 px-6 py-4 bg-surface-container-lowest shrink-0">
-        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5">
+        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Total Meters</p>
-          <h2 className="text-2xl font-headline font-bold text-primary">{kpiData.totalMetersDrilled.toLocaleString()}<span className="text-sm font-normal ml-1">m</span></h2>
+          <div>
+            <h2 className="text-2xl font-headline font-bold text-primary">{counts.metersPlanned.toLocaleString()}<span className="text-sm font-normal ml-1">m</span></h2>
+            <p className="text-[10px] mt-1 space-x-1">
+              <span className="font-bold text-tertiary">{counts.metersCompleted.toLocaleString()}m completed</span>
+              <span className="text-on-surface-variant font-medium">•</span>
+              <span className="font-bold text-on-surface-variant">{(counts.metersPlanned - counts.metersCompleted).toLocaleString()}m remaining</span>
+            </p>
+          </div>
         </div>
-        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5">
+        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Boreholes</p>
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-2xl font-headline font-bold text-primary">{kpiData.totalBoreholes}</h2>
-            <span className="text-[10px] text-on-primary-container">{sections.length} sections</span>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-2xl font-headline font-bold text-primary">{counts.bh}</h2>
+              <span className="text-[10px] text-on-primary-container">{activeSections.size} sections</span>
+            </div>
+            <p className="text-[10px] mt-1 space-x-1">
+              <span className="font-bold text-tertiary">{counts.bhCompleted} completed</span>
+              <span className="text-on-surface-variant font-medium">•</span>
+              <span className="font-bold text-on-surface-variant">{counts.bh - counts.bhCompleted} remaining</span>
+            </p>
           </div>
         </div>
-        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5">
+        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">CPT Tests</p>
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-2xl font-headline font-bold text-secondary">{kpiData.totalCPT}</h2>
-            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-2xl font-headline font-bold text-secondary">{counts.cpt}</h2>
+              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+            </div>
+            <p className="text-[10px] mt-1 space-x-1">
+              <span className="font-bold text-tertiary">{counts.cptCompleted} completed</span>
+              <span className="text-on-surface-variant font-medium">•</span>
+              <span className="font-bold text-on-surface-variant">{counts.cpt - counts.cptCompleted} remaining</span>
+            </p>
           </div>
         </div>
-        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5">
+        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">PLT Tests</p>
-          <h2 className="text-2xl font-headline font-bold text-tertiary">{kpiData.totalPLT}</h2>
+          <div>
+            <h2 className="text-2xl font-headline font-bold text-tertiary">{counts.plt}</h2>
+            <p className="text-[10px] mt-1 space-x-1">
+              <span className="font-bold text-tertiary">{counts.pltCompleted} completed</span>
+              <span className="text-on-surface-variant font-medium">•</span>
+              <span className="font-bold text-on-surface-variant">{counts.plt - counts.pltCompleted} remaining</span>
+            </p>
+          </div>
         </div>
-        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5">
+        <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Budget Efficiency</p>
           <h2 className="text-2xl font-headline font-bold text-primary">{kpiData.budgetEfficiency}%</h2>
           <div className="mt-1 w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
