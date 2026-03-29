@@ -64,10 +64,13 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* TopNavBar */}
-      <header className="bg-background fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-6 h-16 border-b border-outline-variant/10">
-        <div className="flex items-center gap-8">
-          <span className="text-xl font-bold tracking-tighter text-primary font-headline">GeoControl Pro</span>
-          <nav className="hidden md:flex items-center gap-6 font-headline text-sm tracking-wide">
+      <header className="bg-background fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-8 h-28 border-b border-outline-variant/10 shadow-sm">
+        <div className="flex items-center gap-10">
+          <div className="flex flex-col justify-center gap-2">
+            <img src="/acts-recolored.png" alt="ACTS" className="h-20 w-auto object-contain object-left scale-110 origin-left mix-blend-screen" />
+            <span className="text-[11px] font-bold tracking-[0.25em] text-primary uppercase leading-tight opacity-90 pl-1 mt-1">GEO Project Management</span>
+          </div>
+          <nav className="hidden xl:flex items-center gap-8 font-headline text-base tracking-wide ml-6">
             <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Projects</a>
             <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Reports</a>
             <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Team</a>
@@ -134,7 +137,7 @@ export default function Layout() {
       </header>
 
       {/* SideNavBar */}
-      <aside className="bg-surface-container-low fixed left-0 top-0 h-full z-40 border-r border-outline-variant/10 w-64 pt-16 flex flex-col">
+      <aside className="bg-surface-container-low fixed left-0 top-0 h-full z-40 border-r border-outline-variant/10 w-64 pt-28 flex flex-col">
         <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center border border-outline-variant/20">
             <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>precision_manufacturing</span>
@@ -190,7 +193,7 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 pt-16 flex-1 h-screen overflow-hidden flex flex-col">
+      <main className="ml-64 pt-28 flex-1 h-screen overflow-hidden flex flex-col">
         <Outlet />
       </main>
     </div>
