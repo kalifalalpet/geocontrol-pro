@@ -1,0 +1,182 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-background: var(--bg);
+  --color-surface: var(--surf);
+  --color-surface-dim: var(--surf-dim);
+  --color-surface-bright: var(--surf-bri);
+  --color-surface-container-lowest: var(--surf-c-lowest);
+  --color-surface-container-low: var(--surf-c-low);
+  --color-surface-container: var(--surf-c);
+  --color-surface-container-high: var(--surf-c-high);
+  --color-surface-container-highest: var(--surf-c-highest);
+  --color-surface-variant: var(--surf-var);
+  
+  --color-primary: var(--pri);
+  --color-primary-container: var(--pri-cont);
+  --color-on-primary: var(--on-pri);
+  --color-on-primary-container: var(--on-pri-cont);
+  
+  --color-secondary: var(--sec);
+  --color-secondary-fixed: var(--sec-fixed);
+  --color-on-secondary: var(--on-sec);
+  
+  --color-tertiary: var(--ter);
+  --color-tertiary-fixed: var(--ter-fixed);
+  --color-on-tertiary: var(--on-ter);
+  
+  --color-error: var(--err);
+  --color-on-error: var(--on-err);
+  
+  --color-on-surface: var(--on-surf);
+  --color-on-surface-variant: var(--on-surf-var);
+  --color-outline: var(--out);
+  --color-outline-variant: var(--out-var);
+
+  --font-headline: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-label: 'Inter', sans-serif;
+}
+
+:root {
+  /* LIGHT MODE (Clean, airy, professional) */
+  --bg: #f8fafc;
+  --surf: #ffffff;
+  --surf-dim: #f1f5f9;
+  --surf-bri: #ffffff;
+  --surf-c-lowest: #ffffff;
+  --surf-c-low: #f8fafc;
+  --surf-c: #f1f5f9;
+  --surf-c-high: #e2e8f0;
+  --surf-c-highest: #cbd5e1;
+  --surf-var: #e2e8f0;
+  
+  --pri: #1e293b;
+  --pri-cont: #e2e8f0;
+  --on-pri: #ffffff;
+  --on-pri-cont: #475569;
+  
+  --sec: #eab308;
+  --sec-fixed: #eab308;
+  --on-sec: #ffffff;
+  
+  --ter: #10b981;
+  --ter-fixed: #10b981;
+  --on-ter: #ffffff;
+  
+  --err: #ef4444;
+  --on-err: #ffffff;
+  
+  --on-surf: #0f172a;
+  --on-surf-var: #475569;
+  --out: #94a3b8;
+  --out-var: #cbd5e1;
+}
+
+:root.dark {
+  /* DARK MODE (Stitch Original) */
+  --bg: #0b1326;
+  --surf: #0b1326;
+  --surf-dim: #0b1326;
+  --surf-bri: #31394d;
+  --surf-c-lowest: #060e20;
+  --surf-c-low: #131b2e;
+  --surf-c: #171f33;
+  --surf-c-high: #222a3d;
+  --surf-c-highest: #2d3449;
+  --surf-var: #2d3449;
+  
+  --pri: #bec6e0;
+  --pri-cont: #0f172a;
+  --on-pri: #283044;
+  --on-pri-cont: #798098;
+  
+  --sec: #ffb95f;
+  --sec-fixed: #ffb95f;
+  --on-sec: #472a00;
+  
+  --ter: #4edea3;
+  --ter-fixed: #4edea3;
+  --on-ter: #003824;
+  
+  --err: #ffb4ab;
+  --on-err: #690005;
+  
+  --on-surf: #dae2fd;
+  --on-surf-var: #c6c6cd;
+  --out: #909097;
+  --out-var: #45464d;
+}
+
+/* Base styles */
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  color: var(--on-surf);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(45, 52, 73, 0.6);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(190, 198, 224, 0.2);
+}
+
+.glass-card {
+  background: rgba(34, 42, 61, 0.4);
+  backdrop-filter: blur(12px);
+}
+
+/* Selection color */
+::selection {
+  background: rgba(255, 185, 95, 0.3);
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #222a3d;
+  border-radius: 10px;
+}
+
+/* Leaflet overrides for dark theme */
+.leaflet-container {
+  background: #0b1326 !important;
+}
+.leaflet-control-zoom a {
+  background: #222a3d !important;
+  color: #bec6e0 !important;
+  border-color: #45464d !important;
+}
+.leaflet-control-attribution {
+  background: rgba(11, 19, 38, 0.8) !important;
+  color: #798098 !important;
+  font-size: 9px !important;
+}
+.leaflet-control-attribution a {
+  color: #909097 !important;
+}
+
+/* Custom marker pulse */
+@keyframes marker-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.5); }
+}
+.marker-glow {
+  animation: marker-pulse 2s ease-in-out infinite;
+}
