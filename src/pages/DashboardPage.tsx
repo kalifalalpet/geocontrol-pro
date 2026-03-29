@@ -46,37 +46,43 @@ const labelStyle = `
 `
 
 // ═══ DISTINCT MARKER ICONS ═══
-// BH = Circle pin (blue-ish), CPT = Diamond (amber), PLT = Square (green)
-function createBHIcon(isSelected = false) {
+function getSurveyColor(status: 'marked' | 'unmarked' | 'cancelled', defaultColor: string, surveyMode: boolean) {
+  if (!surveyMode) return defaultColor
+  if (status === 'marked') return '#4edea3'
+  if (status === 'cancelled') return '#ff5449'
+  return '#475569' // unmarked
+}
+
+function createBHIcon(isSelected = false, surveyStatus: 'marked'|'unmarked'|'cancelled' = 'unmarked', surveyMode = false) {
   const size = isSelected ? 16 : 10
-  const color = isSelected ? '#ffb95f' : '#bec6e0'
+  const color = getSurveyColor(surveyStatus, isSelected ? '#ffb95f' : '#bec6e0', surveyMode)
   const glow = isSelected ? `filter: drop-shadow(0 0 8px ${color});` : `filter: drop-shadow(0 0 3px ${color}50);`
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="${color}" stroke="#0b1326" stroke-width="1.5" style="${glow}"/></svg>`
   return L.divIcon({ html: svg, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] })
 }
 
-function createCPTIcon(isSelected = false) {
+function createCPTIcon(isSelected = false, surveyStatus: 'marked'|'unmarked'|'cancelled' = 'unmarked', surveyMode = false) {
   const size = isSelected ? 18 : 12
-  const color = isSelected ? '#ffb95f' : '#ffb95f'
+  const color = getSurveyColor(surveyStatus, isSelected ? '#ffb95f' : '#ffb95f', surveyMode)
   const opacity = isSelected ? '1' : '0.85'
   const glow = isSelected ? `filter: drop-shadow(0 0 8px ${color});` : `filter: drop-shadow(0 0 3px ${color}50);`
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 16 16" style="${glow}"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="${color}" stroke="#0b1326" stroke-width="1.5" opacity="${opacity}" transform="rotate(45 8 8)"/></svg>`
   return L.divIcon({ html: svg, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] })
 }
 
-function createPLTIcon(isSelected = false) {
+function createPLTIcon(isSelected = false, surveyStatus: 'marked'|'unmarked'|'cancelled' = 'unmarked', surveyMode = false) {
   const size = isSelected ? 18 : 12
-  const color = isSelected ? '#ffb95f' : '#4edea3'
+  const color = getSurveyColor(surveyStatus, isSelected ? '#ffb95f' : '#4edea3', surveyMode)
   const opacity = isSelected ? '1' : '0.85'
   const glow = isSelected ? `filter: drop-shadow(0 0 8px ${color});` : `filter: drop-shadow(0 0 3px ${color}50);`
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 16 16" style="${glow}"><polygon points="8,1 15,6 13,15 3,15 1,6" fill="${color}" stroke="#0b1326" stroke-width="1.5" opacity="${opacity}"/></svg>`
   return L.divIcon({ html: svg, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] })
 }
 
-function getIcon(point: SitePoint, isSelected: boolean) {
-  if (point.type === 'CPT') return createCPTIcon(isSelected)
-  if (point.type === 'PLT') return createPLTIcon(isSelected)
-  return createBHIcon(isSelected)
+function getIcon(point: SitePoint, isSelected: boolean, surveyMode: boolean) {
+  if (point.type === 'CPT') return createCPTIcon(isSelected, point.surveyStatus, surveyMode)
+  if (point.type === 'PLT') return createPLTIcon(isSelected, point.surveyStatus, surveyMode)
+  return createBHIcon(isSelected, point.surveyStatus, surveyMode)
 }
 
 // Auto-fit map to bounds
@@ -118,6 +124,7 @@ export default function DashboardPage() {
   const [showLabels, setShowLabels] = useState(false)
   const [coordSystem, setCoordSystem] = useState<'UTM37N' | 'WGS84'>('UTM37N')
   const [zoomLevel, setZoomLevel] = useState(14)
+  const [surveyMode, setSurveyMode] = useState(false)
 
   const toggleSection = (section: string) => {
     const newSecs = new Set(activeSections)
@@ -224,7 +231,7 @@ export default function DashboardPage() {
               <Marker
                 key={pt.id}
                 position={[pt.lat, pt.lng]}
-                icon={getIcon(pt, selectedIds.has(pt.id))}
+                icon={getIcon(pt, selectedIds.has(pt.id), surveyMode)}
                 eventHandlers={{ click: (e) => handleMarkerClick(e, pt.id) }}
               >
                 {showLabels && (
@@ -315,6 +322,31 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
+
+            {/* Coordinate System Toggle */}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+              <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Coord System</span>
+              <button 
+                onClick={() => setCoordSystem(c => c === 'UTM37N' ? 'WGS84' : 'UTM37N')}
+                className="px-2 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-tertiary"
+              >
+                {coordSystem}
+              </button>
+            </div>
+
+            {/* Survey Tracking Layer */}
+            <div className="flex items-center justify-between mt-1 pt-2 border-t border-tertiary/20">
+              <span className="text-[10px] text-tertiary uppercase tracking-widest font-bold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[12px]">radar</span> Survey Layer
+              </span>
+              <button 
+                onClick={() => setSurveyMode(!surveyMode)}
+                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ${surveyMode ? 'bg-tertiary text-on-tertiary shadow-[0_0_8px_rgba(78,222,163,0.3)]' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-highest'}`}
+              >
+                {surveyMode ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            
           </div>
 
           {/* Legend */}

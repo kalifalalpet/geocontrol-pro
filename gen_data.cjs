@@ -59,15 +59,15 @@ try {
 } catch(e) {}
 
 const bhLines = data.boreholes.map(b => {
-  return `  { id: '${b.id}', lat: ${b.lat}, lng: ${b.lng}, easting: ${b.easting}, northing: ${b.northing}, type: 'BH', status: 'planned', targetDepth: ${b.targetDepth}, section: '${b.section}', tests: ${JSON.stringify(b.tests)} },`
+  return `  { id: '${b.id}', lat: ${b.lat}, lng: ${b.lng}, easting: ${b.easting}, northing: ${b.northing}, type: 'BH', status: 'planned', targetDepth: ${b.targetDepth}, section: '${b.section}', tests: ${JSON.stringify(b.tests)}, surveyStatus: 'unmarked' },`
 });
 
 const cptLines = data.cpts.map(c => {
-  return `  { id: '${c.id}', lat: ${c.lat}, lng: ${c.lng}, easting: ${c.easting}, northing: ${c.northing}, type: 'CPT', status: 'planned', targetDepth: 25, section: '${c.section}', tests: [{name: 'CPT', count: 1}] },`
+  return `  { id: '${c.id}', lat: ${c.lat}, lng: ${c.lng}, easting: ${c.easting}, northing: ${c.northing}, type: 'CPT', status: 'planned', targetDepth: 25, section: '${c.section}', tests: [{name: 'CPT', count: 1}], surveyStatus: 'unmarked' },`
 });
 
 const pltLines = data.plts.map(p => {
-  return `  { id: '${p.id}', lat: ${p.lat}, lng: ${p.lng}, easting: ${p.easting}, northing: ${p.northing}, type: 'PLT', status: 'planned', targetDepth: 1.5, section: '${p.section}', tests: [{name: 'PLT', count: 1}] },`
+  return `  { id: '${p.id}', lat: ${p.lat}, lng: ${p.lng}, easting: ${p.easting}, northing: ${p.northing}, type: 'PLT', status: 'planned', targetDepth: 1.5, section: '${p.section}', tests: [{name: 'PLT', count: 1}], surveyStatus: 'unmarked' },`
 });
 
 const ts = `// Real project data from QIDDIYA COASTAL.xlsx
@@ -84,6 +84,7 @@ export interface SitePoint {
   targetDepth: number
   section: string
   tests: {name: string, count: number}[]
+  surveyStatus: 'marked' | 'unmarked' | 'cancelled'
 }
 
 export const mapCenter: [number, number] = [${data.center.lat.toFixed(6)}, ${data.center.lng.toFixed(6)}]

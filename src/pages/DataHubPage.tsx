@@ -6,6 +6,9 @@ import { allSitePoints } from '../data/sampleData'
 export default function DataHubPage() {
   const navigate = useNavigate()
   
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'ai' | 'survey'>('ai')
+
   // Extract Stats
   const [extractScope, setExtractScope] = useState('all')
   const [extractFormat, setExtractFormat] = useState('excel')
@@ -112,20 +115,67 @@ export default function DataHubPage() {
     }
   }
 
+  const [surveyFilter, setSurveyFilter] = useState('all')
+  const [surveyTypeFilter, setSurveyTypeFilter] = useState('all')
+  const [surveySearch, setSurveySearch] = useState('')
+
+  // Because allSitePoints is a mutable array imported from sampleData, we need a local state trigger to force re-render when we mutate it.
+  const [, setForceTrigger] = useState(0)
+
+  const handleStatusChange = (id: string, newStatus: 'marked'|'unmarked'|'cancelled') => {
+    const pt = allSitePoints.find(p => p.id === id)
+    if (pt) {
+      pt.surveyStatus = newStatus
+      setForceTrigger(t => t + 1)
+    }
+  }
+
+  const handleElevationChange = (id: string, newElevation: string) => {
+    const pt = allSitePoints.find(p => p.id === id)
+    if (pt) {
+      pt.elevation = parseFloat(newElevation) || 0
+      setForceTrigger(t => t + 1)
+    }
+  }
+
+  const surveyList = allSitePoints.filter(p => {
+    if (surveyFilter !== 'all' && p.surveyStatus !== surveyFilter) return false
+    if (surveyTypeFilter !== 'all' && p.type !== surveyTypeFilter) return false
+    if (surveySearch && !p.id.toLowerCase().includes(surveySearch.toLowerCase())) return false
+    return true
+  })
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-surface text-on-surface">
+    <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-surface text-on-surface flex flex-col">
       
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-headline font-bold text-primary tracking-tight flex items-center gap-3">
           <span className="material-symbols-outlined text-4xl text-tertiary">document_scanner</span>
           A.I. Extractor & Data Hub
         </h1>
         <p className="text-sm text-on-surface-variant max-w-2xl mt-2">
-          Update existing project map points by uploading raw PDF reports. Our OCR extraction engine automatically parses lithology, sensors, and technical notes straight into the visualization dashboard.
+          Update existing project map points by uploading raw PDF reports, or manage the Master Survey tracking matrix for the 306 core points.
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 mb-8 border-b border-outline-variant/10 pb-4">
+        <button 
+          onClick={() => setActiveTab('ai')}
+          className={`px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'ai' ? 'bg-tertiary text-on-tertiary shadow-[0_4px_14px_rgba(78,222,163,0.3)]' : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'}`}
+        >
+          <span className="material-symbols-outlined text-lg">auto_fix_high</span> A.I. Extraction Flow
+        </button>
+        <button 
+          onClick={() => setActiveTab('survey')}
+          className={`px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'survey' ? 'bg-primary text-on-primary shadow-[0_4px_14px_rgba(190,198,224,0.3)]' : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'}`}
+        >
+          <span className="material-symbols-outlined text-lg">radar</span> Survey
+        </button>
+      </div>
+
+      {activeTab === 'ai' && (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         
         {/* COLUMN 1: Update Existing Workflow */}
@@ -294,6 +344,110 @@ export default function DataHubPage() {
 
         </div>
       </div>
+      )}
+
+      {activeTab === 'survey' && (
+        <div className="bg-surface-container-low rounded-2xl relative border border-outline-variant/20 shadow-xl flex flex-col min-h-0 h-[75vh]">
+          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-primary to-transparent"></div>
+          
+          <div className="p-8 flex flex-col h-full min-h-0">
+            <h2 className="text-xl font-headline font-bold text-primary mb-2 flex items-center gap-2 shrink-0">
+              <span className="material-symbols-outlined text-primary">edit_location</span>
+              Survey Progress
+            </h2>
+            <p className="text-sm text-on-surface-variant mb-6 shrink-0">
+              Track and update physical site demarcations. Any status changed here instantly updates the Map Visualizer layer.
+            </p>
+
+            <div className="flex items-center gap-4 mb-6 shrink-0">
+              <input 
+                type="text" 
+                placeholder="Search Point ID (e.g. BH-020)..."
+                value={surveySearch}
+                onChange={e => setSurveySearch(e.target.value)}
+                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors flex-1"
+              />
+              <select 
+                value={surveyTypeFilter}
+                onChange={e => setSurveyTypeFilter(e.target.value)}
+                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer w-[150px]"
+              >
+                <option value="all">All Types</option>
+                <option value="BH">Boreholes (BH)</option>
+                <option value="CPT">CPTs</option>
+                <option value="PLT">PLTs</option>
+              </select>
+              <select 
+                value={surveyFilter}
+                onChange={e => setSurveyFilter(e.target.value)}
+                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer w-[200px]"
+              >
+                <option value="all">All Statuses ({allSitePoints.length})</option>
+                <option value="unmarked">Unmarked ({allSitePoints.filter(p=>p.surveyStatus==='unmarked').length})</option>
+                <option value="marked">Marked ({allSitePoints.filter(p=>p.surveyStatus==='marked').length})</option>
+                <option value="cancelled">Cancelled ({allSitePoints.filter(p=>p.surveyStatus==='cancelled').length})</option>
+              </select>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest relative custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-surface-container-high z-10 border-b border-outline-variant/20">
+                  <tr>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Point ID</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Type</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Section</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Coordinate (E, N)</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Elevation (m)</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Survey Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {surveyList.map((pt, i) => (
+                    <tr key={pt.id} className="border-b border-outline-variant/5 text-sm hover:bg-surface-container/30 transition-colors">
+                      <td className="p-3 font-bold text-primary">{pt.id}</td>
+                      <td className="p-3 text-on-surface-variant font-mono">{pt.type}</td>
+                      <td className="p-3 text-on-surface-variant">{pt.section}</td>
+                      <td className="p-3 text-on-surface-variant font-mono text-[11px]">{pt.easting.toFixed(1)}, {pt.northing.toFixed(1)}</td>
+                      <td className="p-3">
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={pt.elevation || ''}
+                          onChange={(e) => handleElevationChange(pt.id, e.target.value)}
+                          placeholder="0.0"
+                          className="w-20 bg-surface-container-high text-primary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-tertiary transition-colors"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <select 
+                          value={pt.surveyStatus}
+                          onChange={(e) => handleStatusChange(pt.id, e.target.value as any)}
+                          className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded outline-none border border-transparent transition-colors cursor-pointer ${
+                            pt.surveyStatus === 'marked' ? 'bg-tertiary/20 text-tertiary hover:border-tertiary/40' :
+                            pt.surveyStatus === 'cancelled' ? 'bg-error/20 text-error hover:border-error/40' :
+                            'bg-surface-container-highest text-on-surface-variant hover:border-outline-variant/40'
+                          }`}
+                        >
+                          <option value="unmarked">UNMARKED</option>
+                          <option value="marked">MARKED</option>
+                          <option value="cancelled">CANCELLED</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                  {surveyList.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-on-surface-variant text-sm">No points match the filter criteria.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
