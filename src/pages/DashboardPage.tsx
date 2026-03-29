@@ -171,7 +171,7 @@ export default function DashboardPage() {
       cptCompleted: cpt.filter(p => p.status === 'completed').length,
       plt: plt.length,
       pltCompleted: plt.filter(p => p.status === 'completed').length,
-      metersPlanned: filteredPoints.reduce((sum, p) => sum + p.targetDepth, 0),
+      metersPlanned: kpiData.totalMetersDrilled,
       metersCompleted: filteredPoints.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.targetDepth, 0)
     }
   }, [filteredPoints])
