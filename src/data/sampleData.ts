@@ -14,18 +14,22 @@ export interface SitePoint {
   section: string
   tests: {name: string, count: number}[]
   surveyStatus: 'marked' | 'unmarked' | 'cancelled'
+  actualEasting?: number
+  actualNorthing?: number
+  completionDate?: string
+  actualDepth?: number
 }
 
 export const mapCenter: [number, number] = [21.980665, 38.952141]
 
 // ═══ BOREHOLES (236) ═══
 export const boreholePoints: SitePoint[] = [
-  { id: 'BH-001', lat: 21.99396, lng: 38.938139, easting: 493614.3674, northing: 2432159.7555, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"PMT","count":1}], surveyStatus: 'unmarked' },
-  { id: 'BH-002', lat: 21.992541, lng: 38.937814, easting: 493580.7254, northing: 2432002.6231, type: 'BH', status: 'planned', targetDepth: 30, section: '3B', tests: [{"name":"FHT","count":1}], surveyStatus: 'unmarked' },
-  { id: 'BH-003', lat: 21.993049, lng: 38.939382, easting: 493742.702, northing: 2432058.8373, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"PPT","count":1}], surveyStatus: 'unmarked' },
-  { id: 'BH-004', lat: 21.991487, lng: 38.93926, easting: 493729.9954, northing: 2431885.9782, type: 'BH', status: 'planned', targetDepth: 50, section: '2', tests: [{"name":"PMT","count":5},{"name":"FHT","count":1},{"name":"PPT","count":2},{"name":"DST","count":1},{"name":"PZT","count":1}], surveyStatus: 'unmarked' },
-  { id: 'BH-005', lat: 21.994587, lng: 38.940314, easting: 493838.9238, northing: 2432229.0534, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"PPT","count":1}], surveyStatus: 'unmarked' },
-  { id: 'BH-006', lat: 21.995004, lng: 38.941584, easting: 493970.0678, northing: 2432275.0751, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"PMT","count":1}], surveyStatus: 'unmarked' },
+  { id: 'BH-001', lat: 21.99396, lng: 38.938139, easting: 493614.3674, northing: 2432159.7555, type: 'BH', status: 'completed', targetDepth: 30, section: '2', tests: [{"name":"PMT","count":1}], surveyStatus: 'marked', completionDate: '2026-03-10', actualEasting: 493614.3712, actualNorthing: 2432159.7591, elevation: 12.45 },
+  { id: 'BH-002', lat: 21.992541, lng: 38.937814, easting: 493580.7254, northing: 2432002.6231, type: 'BH', status: 'completed', targetDepth: 30, section: '3B', tests: [{"name":"FHT","count":1}], surveyStatus: 'marked', completionDate: '2026-03-12' , actualDepth: 32, actualEasting: 493580.7298, actualNorthing: 2432002.6285, elevation: 11.82 },
+  { id: 'BH-003', lat: 21.993049, lng: 38.939382, easting: 493742.702, northing: 2432058.8373, type: 'BH', status: 'completed', targetDepth: 30, section: '2', tests: [{"name":"PPT","count":1}], surveyStatus: 'marked', completionDate: '2026-03-15', actualDepth: 30, actualEasting: 493742.7055, actualNorthing: 2432058.8412, elevation: 13.15 },
+  { id: 'BH-004', lat: 21.991487, lng: 38.93926, easting: 493729.9954, northing: 2431885.9782, type: 'BH', status: 'completed', targetDepth: 50, section: '2', tests: [{"name":"PMT","count":5},{"name":"FHT","count":1},{"name":"PPT","count":2},{"name":"DST","count":1},{"name":"PZT","count":1}], surveyStatus: 'marked', completionDate: '2026-03-20', actualDepth: 50, actualEasting: 493730.0012, actualNorthing: 2431885.9825, elevation: 10.95 },
+  { id: 'BH-005', lat: 21.994587, lng: 38.940314, easting: 493838.9238, northing: 2432229.0534, type: 'BH', status: 'completed', targetDepth: 30, section: '2', tests: [{"name":"PPT","count":1}], surveyStatus: 'marked', completionDate: '2026-03-25', actualDepth: 28, actualEasting: 493838.9281, actualNorthing: 2432229.0582, elevation: 14.22 },
+  { id: 'BH-006', lat: 21.995004, lng: 38.941584, easting: 493970.0678, northing: 2432275.0751, type: 'BH', status: 'completed', targetDepth: 30, section: '2', tests: [{"name":"PMT","count":1}], surveyStatus: 'marked', completionDate: '2026-03-28' , actualDepth: 30, actualEasting: 493970.0715, actualNorthing: 2432275.0792, elevation: 13.88 },
   { id: 'BH-007', lat: 21.993981, lng: 38.94251, easting: 494065.6037, northing: 2432161.8208, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"DST","count":1}], surveyStatus: 'unmarked' },
   { id: 'BH-008', lat: 21.993001, lng: 38.941067, easting: 493916.5364, northing: 2432053.42, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"FHT","count":1}], surveyStatus: 'unmarked' },
   { id: 'BH-009', lat: 21.99204, lng: 38.940435, easting: 493851.3125, northing: 2431947.0639, type: 'BH', status: 'planned', targetDepth: 30, section: '2', tests: [{"name":"PPT","count":1}], surveyStatus: 'unmarked' },
@@ -357,8 +361,8 @@ export const kpiData = {
   totalMetersDrilled: 6750,
   sections: ["2","3B","1","3A"],
   budgetEfficiency: 92,
-  daysToCompletion: 18,
-  estimatedEnd: 'Nov 24',
+  daysToCompletion: 245,
+  estimatedEnd: 'Oct 26',
 }
 
 // ═══ SOIL STRATA (Sample for sidebar) ═══
@@ -408,11 +412,11 @@ export const pltData = [
 ]
 
 export const rigs = [
-  { id: 'GTX-400-01', model: 'Atlas Copco T3W', currentSite: 'Sector 7-G', status: 'drilling', nextMaint: '24 OCT 23' },
-  { id: 'GTX-400-05', model: 'Schramm T450', currentSite: 'North Ridge', status: 'mobilizing', nextMaint: '12 NOV 23' },
+  { id: 'GTX-400-01', model: 'Atlas Copco T3W', currentSite: 'Sector 7-G', status: 'drilling', nextMaint: '15 APR 26' },
+  { id: 'GTX-400-05', model: 'Schramm T450', currentSite: 'North Ridge', status: 'mobilizing', nextMaint: '22 APR 26' },
   { id: 'GTX-250-09', model: 'Sandvik DE710', currentSite: 'BH-104', status: 'standby', nextMaint: 'IMMEDIATE' },
-  { id: 'CPT-002', model: 'Pagani TG63-150', currentSite: 'CPT Cluster A', status: 'drilling', nextMaint: '15 DEC 23' },
-  { id: 'RIG-008', model: 'Comacchio MC12', currentSite: 'BH-104', status: 'drilling', nextMaint: '02 JAN 24' },
+  { id: 'CPT-002', model: 'Pagani TG63-150', currentSite: 'CPT Cluster A', status: 'drilling', nextMaint: '10 MAY 26' },
+  { id: 'RIG-008', model: 'Comacchio MC12', currentSite: 'BH-104', status: 'drilling', nextMaint: '05 JUN 26' },
 ]
 
 export const personnel = [

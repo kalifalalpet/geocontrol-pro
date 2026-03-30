@@ -125,6 +125,10 @@ export default function DataHubPage() {
   const handleStatusChange = (id: string, newStatus: 'marked'|'unmarked'|'cancelled') => {
     const pt = allSitePoints.find(p => p.id === id)
     if (pt) {
+      if (newStatus === 'marked' && (!pt.actualEasting || !pt.actualNorthing || !pt.elevation)) {
+        alert(`Action Denied: ${id} cannot be set to "Marked" without Actual Easting, Actual Northing, and Elevation. Please fill these in first.`)
+        return
+      }
       pt.surveyStatus = newStatus
       setForceTrigger(t => t + 1)
     }
@@ -136,6 +140,64 @@ export default function DataHubPage() {
       pt.elevation = parseFloat(newElevation) || 0
       setForceTrigger(t => t + 1)
     }
+  }
+  const handleActualCoordChange = (id: string, field: 'actualEasting' | 'actualNorthing', value: string) => {
+    const pt = allSitePoints.find(p => p.id === id)
+    if (pt) {
+      pt[field] = parseFloat(value) || 0
+      setForceTrigger(t => t + 1)
+    }
+  }
+
+  const downloadSurveyTemplate = () => {
+    const headers = ["Point ID", "Actual Easting", "Actual Northing", "Elevation"]
+    const rows = allSitePoints.map(p => [
+      p.id, 
+      p.actualEasting ? p.actualEasting.toFixed(4) : '', 
+      p.actualNorthing ? p.actualNorthing.toFixed(4) : '', 
+      p.elevation ? p.elevation.toFixed(4) : ''
+    ])
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n")
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.setAttribute("href", url)
+    link.setAttribute("download", "SURVEY_ACTUALS_TEMPLATE.csv")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleSurveyUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const lines = text.split("\n")
+      // Skip header
+      for (let i = 1; i < lines.length; i++) {
+        const [id, eCoord, nCoord, elev] = lines[i].split(",").map(s => s.trim())
+        if (!id) continue
+        const pt = allSitePoints.find(p => p.id === id)
+        if (pt) {
+          if (eCoord) pt.actualEasting = parseFloat(eCoord)
+          if (nCoord) pt.actualNorthing = parseFloat(nCoord)
+          if (elev) pt.elevation = parseFloat(elev)
+        }
+      }
+      setForceTrigger(t => t + 1)
+      alert("Survey data updated successfully.")
+    }
+    reader.readAsText(file)
+  }
+
+  const calculateDelta = (p: typeof allSitePoints[0]) => {
+    if (!p.actualEasting || !p.actualNorthing) return null
+    const de = p.actualEasting - p.easting
+    const dn = p.actualNorthing - p.northing
+    return Math.sqrt(de * de + dn * dn).toFixed(4)
   }
 
   const surveyList = allSitePoints.filter(p => {
@@ -380,13 +442,27 @@ export default function DataHubPage() {
               <select 
                 value={surveyFilter}
                 onChange={e => setSurveyFilter(e.target.value)}
-                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer w-[200px]"
+                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer w-[180px]"
               >
                 <option value="all">All Statuses ({allSitePoints.length})</option>
                 <option value="unmarked">Unmarked ({allSitePoints.filter(p=>p.surveyStatus==='unmarked').length})</option>
                 <option value="marked">Marked ({allSitePoints.filter(p=>p.surveyStatus==='marked').length})</option>
                 <option value="cancelled">Cancelled ({allSitePoints.filter(p=>p.surveyStatus==='cancelled').length})</option>
               </select>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={downloadSurveyTemplate}
+                  className="bg-surface-container-high hover:bg-surface-container-highest text-primary border border-outline-variant/20 px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all"
+                  title="Download CSV Template with IDs"
+                >
+                  <span className="material-symbols-outlined text-sm">download</span> Template
+                </button>
+                <label className="bg-secondary text-on-secondary px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2 cursor-pointer hover:brightness-110 transition-all shadow-lg active:scale-95">
+                  <span className="material-symbols-outlined text-sm">upload</span> Upload Survey
+                  <input type="file" accept=".csv" className="hidden" onChange={handleSurveyUpload} />
+                </label>
+              </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest relative custom-scrollbar">
@@ -396,48 +472,78 @@ export default function DataHubPage() {
                     <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Point ID</th>
                     <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Type</th>
                     <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Section</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Coordinate (E, N)</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Elevation (m)</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Survey Status</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Proposed (E, N)</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-secondary">Actual E</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-secondary">Actual N</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Elev. (m)</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-tertiary">Delta (m)</th>
+                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {surveyList.map((pt, i) => (
-                    <tr key={pt.id} className="border-b border-outline-variant/5 text-sm hover:bg-surface-container/30 transition-colors">
+                    <tr key={pt.id} className={`border-b border-outline-variant/5 text-sm hover:bg-surface-container transition-colors ${i % 2 === 0 ? 'bg-surface-container-lowest/30' : ''}`}>
                       <td className="p-3 font-bold text-primary">{pt.id}</td>
                       <td className="p-3 text-on-surface-variant font-mono">{pt.type}</td>
                       <td className="p-3 text-on-surface-variant">{pt.section}</td>
-                      <td className="p-3 text-on-surface-variant font-mono text-[11px]">{pt.easting.toFixed(1)}, {pt.northing.toFixed(1)}</td>
+                      <td className="p-3 text-on-surface-variant font-mono text-[10px]">{pt.easting.toFixed(4)},<br/>{pt.northing.toFixed(4)}</td>
                       <td className="p-3">
                         <input 
                           type="number" 
-                          step="0.01"
-                          value={pt.elevation || ''}
-                          onChange={(e) => handleElevationChange(pt.id, e.target.value)}
-                          placeholder="0.0"
-                          className="w-20 bg-surface-container-high text-primary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-tertiary transition-colors"
+                          step="0.0001"
+                          value={pt.actualEasting ?? ''}
+                          onChange={(e) => handleActualCoordChange(pt.id, 'actualEasting', e.target.value)}
+                          placeholder="E..."
+                          className="w-24 bg-surface-container-high text-secondary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-secondary transition-colors"
                         />
                       </td>
                       <td className="p-3">
+                        <input 
+                          type="number" 
+                          step="0.0001"
+                          value={pt.actualNorthing ?? ''}
+                          onChange={(e) => handleActualCoordChange(pt.id, 'actualNorthing', e.target.value)}
+                          placeholder="N..."
+                          className="w-24 bg-surface-container-high text-secondary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-secondary transition-colors"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input 
+                          type="number" 
+                          step="0.0001"
+                          value={pt.elevation || ''}
+                          onChange={(e) => handleElevationChange(pt.id, e.target.value)}
+                          placeholder="0.0"
+                          className="w-16 bg-surface-container-high text-primary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-tertiary transition-colors"
+                        />
+                      </td>
+                      <td className="p-3 font-mono text-xs font-bold">
+                        {calculateDelta(pt) ? (
+                          <span className={`${parseFloat(calculateDelta(pt)!) > 0.5 ? 'text-error' : 'text-tertiary'}`}>
+                            {calculateDelta(pt)}m
+                          </span>
+                        ) : '--'}
+                      </td>
+                      <td className="p-3 text-center">
                         <select 
                           value={pt.surveyStatus}
                           onChange={(e) => handleStatusChange(pt.id, e.target.value as any)}
-                          className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded outline-none border border-transparent transition-colors cursor-pointer ${
+                          className={`text-xs font-bold uppercase tracking-widest px-2 py-1 rounded outline-none border border-transparent transition-colors cursor-pointer ${
                             pt.surveyStatus === 'marked' ? 'bg-tertiary/20 text-tertiary hover:border-tertiary/40' :
                             pt.surveyStatus === 'cancelled' ? 'bg-error/20 text-error hover:border-error/40' :
                             'bg-surface-container-highest text-on-surface-variant hover:border-outline-variant/40'
                           }`}
                         >
-                          <option value="unmarked">UNMARKED</option>
-                          <option value="marked">MARKED</option>
-                          <option value="cancelled">CANCELLED</option>
+                          <option value="unmarked">UNM</option>
+                          <option value="marked">MRK</option>
+                          <option value="cancelled">CAN</option>
                         </select>
                       </td>
                     </tr>
                   ))}
                   {surveyList.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-on-surface-variant text-sm">No points match the filter criteria.</td>
+                      <td colSpan={9} className="p-8 text-center text-on-surface-variant text-sm">No points match the filter criteria.</td>
                     </tr>
                   )}
                 </tbody>

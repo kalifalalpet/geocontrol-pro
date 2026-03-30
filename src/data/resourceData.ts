@@ -21,6 +21,7 @@ export interface Asset {
   calibrationPeriodDays: number | string | null;
   calibrationDueDate: string | null;
   conditionRemark: string;
+  currentPosition?: string; // Point ID or 'Idle'
 }
 
 export const initialPersonnels: Personnel[] = [
@@ -234,10 +235,11 @@ export const initialAssets: Asset[] = [
     "modelNumber": "12345-A",
     "manufacturedYear": 2012,
     "calibrationStatus": "Active",
-    "calibratedDate": "2025-12-12",
+    "calibratedDate": "2026-03-20",
     "calibrationPeriodDays": 180,
-    "calibrationDueDate": "2026-06-10",
-    "conditionRemark": "Working well"
+    "calibrationDueDate": "2026-09-16",
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 2,
@@ -246,10 +248,11 @@ export const initialAssets: Asset[] = [
     "modelNumber": "12345-B",
     "manufacturedYear": 2015,
     "calibrationStatus": "Active",
-    "calibratedDate": "2025-10-13",
+    "calibratedDate": "2026-03-22",
     "calibrationPeriodDays": 360,
-    "calibrationDueDate": "2026-10-08",
-    "conditionRemark": "Working well"
+    "calibrationDueDate": "2027-03-17",
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 3,
@@ -261,7 +264,8 @@ export const initialAssets: Asset[] = [
     "calibratedDate": "2025-08-14",
     "calibrationPeriodDays": 720,
     "calibrationDueDate": "2027-08-04",
-    "conditionRemark": "Periodic maintenance required"
+    "conditionRemark": "Periodic maintenance required",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 4,
@@ -273,7 +277,8 @@ export const initialAssets: Asset[] = [
     "calibratedDate": null,
     "calibrationPeriodDays": "N/A",
     "calibrationDueDate": null,
-    "conditionRemark": "Periodic maintenance required"
+    "conditionRemark": "Periodic maintenance required",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 5,
@@ -282,10 +287,11 @@ export const initialAssets: Asset[] = [
     "modelNumber": "12345-E",
     "manufacturedYear": 2025,
     "calibrationStatus": "Active",
-    "calibratedDate": "2025-08-14",
+    "calibratedDate": "2026-03-25",
     "calibrationPeriodDays": 720,
-    "calibrationDueDate": "2027-08-04",
-    "conditionRemark": "Periodic maintenance required"
+    "calibrationDueDate": "2028-03-14",
+    "conditionRemark": "Periodic maintenance required",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 6,
@@ -294,10 +300,11 @@ export const initialAssets: Asset[] = [
     "modelNumber": "12345-F",
     "manufacturedYear": 2025,
     "calibrationStatus": "Active",
-    "calibratedDate": "2025-08-14",
+    "calibratedDate": "2026-03-15",
     "calibrationPeriodDays": 720,
-    "calibrationDueDate": "2027-08-04",
-    "conditionRemark": "Working well"
+    "calibrationDueDate": "2028-03-04",
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 7,
@@ -306,10 +313,11 @@ export const initialAssets: Asset[] = [
     "modelNumber": "12345-G",
     "manufacturedYear": 2025,
     "calibrationStatus": "Active",
-    "calibratedDate": "2025-08-14",
+    "calibratedDate": "2026-03-10",
     "calibrationPeriodDays": 720,
-    "calibrationDueDate": "2027-08-04",
-    "conditionRemark": "Periodic maintenance required"
+    "calibrationDueDate": "2028-02-28",
+    "conditionRemark": "Periodic maintenance required",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 8,
@@ -318,10 +326,11 @@ export const initialAssets: Asset[] = [
     "modelNumber": "12345-H",
     "manufacturedYear": 2025,
     "calibrationStatus": "Active",
-    "calibratedDate": "2025-08-14",
+    "calibratedDate": "2026-03-05",
     "calibrationPeriodDays": 720,
-    "calibrationDueDate": "2027-08-04",
-    "conditionRemark": "Working well"
+    "calibrationDueDate": "2028-02-23",
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 9,
@@ -333,7 +342,8 @@ export const initialAssets: Asset[] = [
     "calibratedDate": null,
     "calibrationPeriodDays": "N/A",
     "calibrationDueDate": null,
-    "conditionRemark": "N/A"
+    "conditionRemark": "N/A",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 10,
@@ -345,7 +355,8 @@ export const initialAssets: Asset[] = [
     "calibratedDate": null,
     "calibrationPeriodDays": "N/A",
     "calibrationDueDate": null,
-    "conditionRemark": "N/A"
+    "conditionRemark": "N/A",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 11,
@@ -357,7 +368,8 @@ export const initialAssets: Asset[] = [
     "calibratedDate": null,
     "calibrationPeriodDays": "N/A",
     "calibrationDueDate": null,
-    "conditionRemark": "Working well"
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 12,
@@ -369,7 +381,8 @@ export const initialAssets: Asset[] = [
     "calibratedDate": null,
     "calibrationPeriodDays": "N/A",
     "calibrationDueDate": null,
-    "conditionRemark": "Working well"
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   },
   {
     "slNo": 13,
@@ -381,6 +394,7 @@ export const initialAssets: Asset[] = [
     "calibratedDate": null,
     "calibrationPeriodDays": "N/A",
     "calibrationDueDate": null,
-    "conditionRemark": "Working well"
+    "conditionRemark": "Working well",
+    "currentPosition": "Idle"
   }
 ];

@@ -17,6 +17,13 @@ export interface Expense {
   status: 'Paid' | 'Pending' | 'Approved'
 }
 
+export interface InvoiceItem {
+  desc: string
+  qty: number
+  rate: number
+  total: number
+}
+
 export interface Invoice {
   id: string
   date: string
@@ -24,6 +31,16 @@ export interface Invoice {
   clientOrSection: string
   amount: number
   status: 'Draft' | 'Submitted' | 'Paid' | 'Overdue'
+  items?: InvoiceItem[]
+  subtotal?: number
+  tax?: number
+}
+
+export const BOQ_RATES = {
+  BH_DRILLING: 450, // per meter
+  CPT_TEST: 3500,   // per test
+  PLT_TEST: 6500,   // per test
+  VAT_RATE: 0.15    // 15% VAT
 }
 
 export interface CashFlowPoint {
@@ -43,26 +60,26 @@ export const initialBudgetCategories: BudgetCategory[] = [
 ]
 
 export const initialInvoices: Invoice[] = [
-  { id: 'INV-2025-001', date: '2025-07-01', dueDate: '2025-08-01', clientOrSection: 'Section 1 Moblization', amount: 125000, status: 'Paid' },
-  { id: 'INV-2025-002', date: '2025-08-15', dueDate: '2025-09-15', clientOrSection: 'Section 1 Core Drilling', amount: 280000, status: 'Paid' },
-  { id: 'INV-2025-003', date: '2025-09-10', dueDate: '2025-10-10', clientOrSection: 'Section 2 CPT Testing', amount: 95000, status: 'Submitted' },
-  { id: 'INV-2025-004', date: '2025-08-20', dueDate: '2025-09-20', clientOrSection: 'Section 3B Soil Reports', amount: 45000, status: 'Overdue' },
-  { id: 'INV-2025-005', date: '2025-10-05', dueDate: '2025-11-05', clientOrSection: 'Section 3A Phase 1', amount: 110000, status: 'Draft' },
+  { id: 'INV-2026-001', date: '2026-03-22', dueDate: '2026-04-22', clientOrSection: 'Section 1 Moblization', amount: 125000, status: 'Paid' },
+  { id: 'INV-2026-002', date: '2026-03-25', dueDate: '2026-04-25', clientOrSection: 'Section 1 Core Drilling', amount: 280000, status: 'Paid' },
+  { id: 'INV-2026-003', date: '2026-03-28', dueDate: '2026-04-28', clientOrSection: 'Section 2 CPT Testing', amount: 95000, status: 'Submitted' },
+  { id: 'INV-2026-004', date: '2026-03-30', dueDate: '2026-04-30', clientOrSection: 'Section 3B Soil Reports', amount: 45000, status: 'Overdue' },
+  { id: 'INV-2026-005', date: '2026-04-05', dueDate: '2026-05-05', clientOrSection: 'Section 3A Phase 1', amount: 110000, status: 'Draft' },
 ]
 
 export const initialExpenses: Expense[] = [
-  { id: 'EXP-1001', date: '2025-09-02', description: 'Diesel Supply - 5000L', categoryId: 'cat-5', amount: 6500, status: 'Paid' },
-  { id: 'EXP-1002', date: '2025-09-05', description: 'Bentonite 200 bags', categoryId: 'cat-3', amount: 4200, status: 'Paid' },
-  { id: 'EXP-1003', date: '2025-09-15', description: 'Rig DR-001 Maintenance', categoryId: 'cat-1', amount: 15000, status: 'Approved' },
-  { id: 'EXP-1004', date: '2025-09-28', description: 'September Payroll', categoryId: 'cat-2', amount: 42000, status: 'Paid' },
-  { id: 'EXP-1005', date: '2025-09-30', description: 'Third-party Lab Testing', categoryId: 'cat-4', amount: 8500, status: 'Pending' },
+  { id: 'EXP-2001', date: '2026-03-22', description: 'Diesel Supply - 5000L', categoryId: 'cat-5', amount: 6500, status: 'Paid' },
+  { id: 'EXP-2002', date: '2026-03-24', description: 'Bentonite 200 bags', categoryId: 'cat-3', amount: 4200, status: 'Paid' },
+  { id: 'EXP-2003', date: '2026-03-26', description: 'Rig DR-001 Maintenance', categoryId: 'cat-1', amount: 15000, status: 'Approved' },
+  { id: 'EXP-2004', date: '2026-03-28', description: 'March Payroll', categoryId: 'cat-2', amount: 42000, status: 'Paid' },
+  { id: 'EXP-2005', date: '2026-03-30', description: 'Third-party Lab Testing', categoryId: 'cat-4', amount: 8500, status: 'Pending' },
 ]
 
 export const initialCashFlow: CashFlowPoint[] = [
-  { month: 'May', revenue: 0, expenses: 120000 },
-  { month: 'Jun', revenue: 50000, expenses: 95000 },
-  { month: 'Jul', revenue: 150000, expenses: 85000 },
-  { month: 'Aug', revenue: 320000, expenses: 140000 },
-  { month: 'Sep', revenue: 210000, expenses: 165000 },
-  { month: 'Oct', revenue: 180000, expenses: 90000 }, // Projected
+  { month: 'Jan 2026', revenue: 0, expenses: 20000 },
+  { month: 'Feb 2026', revenue: 0, expenses: 45000 },
+  { month: 'Mar 2026', revenue: 500000, expenses: 120000 },
+  { month: 'Apr 2026', revenue: 420000, expenses: 140000 },
+  { month: 'May 2026', revenue: 380000, expenses: 165000 },
+  { month: 'Jun 2026', revenue: 450000, expenses: 90000 }, 
 ]

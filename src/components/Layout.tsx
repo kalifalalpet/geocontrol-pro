@@ -67,8 +67,8 @@ export default function Layout() {
       <header className="bg-background fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-8 h-28 border-b border-outline-variant/10 shadow-sm">
         <div className="flex items-center gap-10">
           <div className="flex flex-col justify-center gap-2">
-            <img src="/acts-recolored.png" alt="ACTS" className="h-20 w-[400px] object-fill mix-blend-screen" />
-            <span className="text-[11px] font-bold tracking-[0.25em] text-primary uppercase leading-tight opacity-90 pl-1 mt-1">GEO Project Management</span>
+            <img src="/acts-banner-logo.png" alt="ACTS" className="h-[96px] w-[350px] object-contain object-left mix-blend-screen" />
+            <span className="text-xs font-bold tracking-[0.25em] text-primary uppercase leading-tight opacity-90 pl-1 mt-1">GEO Project Management</span>
           </div>
           <nav className="hidden xl:flex items-center gap-8 font-headline text-base tracking-wide ml-6">
             <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Projects</a>

@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, GeoJSON, 
 import { Link } from 'react-router-dom'
 import L from 'leaflet'
 import { allSitePoints, boreholePoints, cptPoints, pltPoints, mapCenter, kpiData, soilStrata, sections, sectionPolygons, type SitePoint } from '../data/sampleData'
+import { useResource } from '../context/ResourceContext'
 
 // ═══ COMMON STYLES ═══
 const labelStyle = `
@@ -85,6 +86,42 @@ function getIcon(point: SitePoint, isSelected: boolean, surveyMode: boolean) {
   return createBHIcon(isSelected, point.surveyStatus, surveyMode)
 }
 
+function createAssetIcon(type: string) {
+  let color = '#ffb95f' // Default orange
+  let path = ''
+  
+  if (type === 'Drilling Rig') {
+    color = '#ff5449' // Red for Rigs
+    path = "M8 1 L14 15 H2 Z M8 3 V13 M5 15 L8 7 L11 15" // Simple Rig/Derrick
+  } else if (type === 'JCB') {
+    color = '#ffb949' // Yellow/Orange
+    path = "M2 14 H6 V10 H10 V14 H14 V8 H10 L8 5 H4 L2 8 Z" // Digger shape
+  } else if (type === 'CPT' || type === 'PLT') {
+    color = '#4edea3' // Green for instruments
+    path = "M8 2 L14 8 L8 14 L2 8 Z M8 5 V11 M5 8 H11" // Diamond probe
+  } else if (type === 'Water Tanker' || type === 'Water Pump') {
+    color = '#4796ff' // Blue for water
+    path = "M4 6 H12 V14 H4 Z M4 10 H14 M8 2 C8 2 12 5 12 8 C12 10 10 12 8 12 C6 12 4 10 4 8 C4 5 8 2 8 2 Z" // Drop/Tank
+  } else {
+    path = "M8 2 A6 6 0 1 0 8 14 A6 6 0 1 0 8 2" // Circle
+  }
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 0 4px ${color}80);">
+      <circle cx="12" cy="12" r="10" fill="#0b1326" stroke="${color}" stroke-width="1.5" opacity="0.9"/>
+      <g transform="translate(4,4) scale(0.65)" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="${path}" />
+      </g>
+    </svg>`
+  
+  return L.divIcon({ 
+    html: svg, 
+    className: 'asset-marker-icon', 
+    iconSize: [24, 24], 
+    iconAnchor: [12, 12] 
+  })
+}
+
 // Auto-fit map to bounds
 function FitBounds({ points }: { points: SitePoint[] }) {
   const map = useMap()
@@ -115,8 +152,9 @@ function MapClickHandler({ clearSelection }: { clearSelection: () => void }) {
 }
 
 export default function DashboardPage() {
+  const { assets } = useResource()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [showLayers, setShowLayers] = useState({ BH: true, CPT: true, PLT: true })
+  const [showLayers, setShowLayers] = useState({ BH: true, CPT: true, PLT: true, assets: true })
   
   // Advanced Settings Toggles
   const [activeSections, setActiveSections] = useState<Set<string>>(new Set(sections)) // Default to all sections
@@ -288,6 +326,35 @@ export default function DashboardPage() {
                 </Popup>
               </Marker>
             ))}
+
+            {/* Render Active Assets */}
+            {showLayers.assets && assets.filter(a => a.currentPosition && a.currentPosition !== 'Idle').map(a => {
+              const pt = allSitePoints.find(p => p.id === a.currentPosition)
+              if (!pt) return null
+              return (
+                <Marker
+                  key={`asset-${a.assetId}`}
+                  position={[pt.lat, pt.lng]}
+                  icon={createAssetIcon(a.assetType)}
+                  zIndexOffset={1000} // Ensure assets are above borehole points
+                >
+                  <Tooltip direction="bottom" offset={[0, 10]} className="custom-marker-label">
+                    <span style={{ color: '#ffb95f' }}>{a.assetId} ({a.assetType})</span>
+                  </Tooltip>
+                  <Popup>
+                    <div style={{ fontFamily: 'Inter, sans-serif', color: '#131b2e', minWidth: 150 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#ff5449' }}>{a.assetType}</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, margin: '2px 0' }}>{a.assetId}</div>
+                      <div style={{ fontSize: 11, color: '#475569', marginBottom: 6 }}>Model: {a.modelNumber}</div>
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 6 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: '#94a3b8' }}>Current Assignment</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#0b1326' }}>{pt.id} (Sec {pt.section})</div>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              )
+            })}
           </MapContainer>
 
           {/* Map Layers Panel */}
@@ -338,6 +405,13 @@ export default function DashboardPage() {
             >
               <svg width="10" height="10" viewBox="0 0 16 16"><polygon points="8,1 15,6 13,15 3,15 1,6" fill={showLayers.PLT ? '#4edea3' : '#45464d'}/></svg>
               PLT Tests ({counts.plt})
+            </button>
+            <button
+              onClick={() => setShowLayers(p => ({ ...p, assets: !p.assets }))}
+              className={`flex items-center gap-3 px-3 py-1.5 rounded text-xs font-medium transition-colors ${showLayers.assets ? 'bg-surface-container-highest text-secondary' : 'text-on-primary-container/50'}`}
+            >
+              <span className="material-symbols-outlined text-[14px]">local_shipping</span>
+              Fleet tracking ({assets.length})
             </button>
 
             {/* Section Multi-Select */}
@@ -405,14 +479,6 @@ export default function DashboardPage() {
             </div>
             <span className="text-[10px] text-on-primary-container font-mono">{filteredPoints.length} shown</span>
           </div>
-
-          {/* Upload FAB */}
-          <div className="absolute bottom-6 right-6 z-[1000]">
-            <button className="bg-secondary text-on-secondary-fixed font-bold p-4 rounded-xl shadow-2xl flex items-center gap-3 hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined">add_circle</span>
-              <span className="font-headline tracking-tight uppercase text-xs">Upload Excel Data</span>
-            </button>
-          </div>
         </div>
 
         {/* Detail Sidebar - Single Selection */}
@@ -448,13 +514,13 @@ export default function DashboardPage() {
                   <div className="text-right">
                     {coordSystem === 'UTM37N' ? (
                       <>
-                        <p className="text-[11px] font-mono text-primary font-bold">{selected.easting?.toFixed(1) || '-'} E</p>
-                        <p className="text-[11px] font-mono text-primary font-bold">{selected.northing?.toFixed(1) || '-'} N</p>
+                        <p className="text-[11px] font-mono text-primary font-bold">{selected.easting?.toFixed(4) || '-'} E</p>
+                        <p className="text-[11px] font-mono text-primary font-bold">{selected.northing?.toFixed(4) || '-'} N</p>
                       </>
                     ) : (
                       <>
-                        <p className="text-[11px] font-mono text-primary font-bold">{selected.lat.toFixed(5)}°N</p>
-                        <p className="text-[11px] font-mono text-primary font-bold">{selected.lng.toFixed(5)}°E</p>
+                        <p className="text-[11px] font-mono text-primary font-bold">{selected.lat.toFixed(6)}°N</p>
+                        <p className="text-[11px] font-mono text-primary font-bold">{selected.lng.toFixed(6)}°E</p>
                       </>
                     )}
                   </div>
