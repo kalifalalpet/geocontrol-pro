@@ -1,18 +1,29 @@
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { allSitePoints } from '../data/sampleData'
+import { useProjects } from '../context/ProjectContext'
 
-const navItems = [
-  { to: '/map', icon: 'map', label: 'Project Map' },
-  { to: '/logs', icon: 'description', label: 'Data Viewer' },
-  { to: '/resources', icon: 'precision_manufacturing', label: 'Resource Tracking' },
-  { to: '/finance', icon: 'payments', label: 'Financial Dashboard' },
-  { to: '/data', icon: 'sync_alt', label: 'Data Hub' },
-]
+const TEXT_SIZES = [12, 13, 14, 15, 16, 17, 18]
 
 export default function Layout() {
+  const { id } = useParams()
+  const { projects, setActiveProjectId } = useProjects()
   const location = useLocation()
   const navigate = useNavigate()
+  
+  const project = projects.find(p => p.id === id)
+
+  useEffect(() => {
+    if (id) setActiveProjectId(id)
+  }, [id, setActiveProjectId])
+
+  const navItems = [
+    { to: `/project/${id}/map`, icon: 'map', label: 'Project Map' },
+    { to: `/project/${id}/logs`, icon: 'description', label: 'Data Viewer' },
+    { to: `/project/${id}/resources`, icon: 'precision_manufacturing', label: 'Resource Tracking' },
+    { to: `/project/${id}/finance`, icon: 'payments', label: 'Financial Dashboard' },
+    { to: `/project/${id}/data`, icon: 'sync_alt', label: 'Data Hub' },
+  ]
 
   // Theme Toggle State
   const [isDark, setIsDark] = useState(true)
@@ -23,6 +34,21 @@ export default function Layout() {
       document.documentElement.classList.remove('dark')
     }
   }, [isDark])
+
+  // Text Size State
+  const [textSizeIdx, setTextSizeIdx] = useState(() => {
+    const saved = localStorage.getItem('gc-text-size')
+    return saved ? parseInt(saved) : 2 // default 14px
+  })
+  useEffect(() => {
+    const size = TEXT_SIZES[textSizeIdx] || 14
+    document.documentElement.style.setProperty('--base-font-size', `${size}px`)
+    document.documentElement.style.fontSize = `${size}px`
+    localStorage.setItem('gc-text-size', String(textSizeIdx))
+  }, [textSizeIdx])
+
+  // Mobile sidebar toggle
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Advanced Search State
   const [searchQuery, setSearchQuery] = useState('')
@@ -55,110 +81,52 @@ export default function Layout() {
     }
   }
 
-  const handleSuggestionClick = (id: string) => {
+  const handleSuggestionClick = (sid: string) => {
     setShowSuggestions(false)
     setSearchQuery('')
-    navigate(`/logs?ids=${id}`)
+    navigate(`/project/${id}/logs?ids=${sid}`)
   }
 
+  if (!project) return <div className="p-20 text-white">Project not found.</div>
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* TopNavBar */}
-      <header className="bg-background fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-8 h-28 border-b border-outline-variant/10 shadow-sm">
-        <div className="flex items-center gap-10">
-          <div className="flex flex-col justify-center gap-2">
-            <img src="/acts-banner-logo.png" alt="ACTS" className="h-[96px] w-[350px] object-contain object-left mix-blend-screen" />
-            <span className="text-xs font-bold tracking-[0.25em] text-primary uppercase leading-tight opacity-90 pl-1 mt-1">GEO Project Management</span>
-          </div>
-          <nav className="hidden xl:flex items-center gap-8 font-headline text-base tracking-wide ml-6">
-            <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Projects</a>
-            <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Reports</a>
-            <a className="text-on-primary-container hover:text-on-surface transition-colors px-2 py-1" href="#">Team</a>
-          </nav>
-        </div>
-        <div className="flex items-center flex-1 max-w-md mx-12">
-          <div className="relative w-full" ref={searchRef}>
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg">search</span>
-            <input
-              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-2 pl-10 pr-4 text-sm text-primary focus:ring-1 focus:ring-secondary focus:outline-none transition-all placeholder:text-on-primary-container/70"
-              placeholder="Search points (e.g. BH-004)..."
-              type="text"
-              value={searchQuery}
-              onChange={handleSearchInput}
-              onFocus={() => { if (searchQuery.length > 0) setShowSuggestions(true) }}
-            />
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute top-12 left-0 w-full bg-surface-container-high border border-outline-variant/20 shadow-xl rounded-lg overflow-hidden z-[100]">
-                <ul className="max-h-64 overflow-y-auto custom-scrollbar p-1">
-                  {suggestions.map(s => (
-                    <li 
-                      key={s.id}
-                      onClick={() => handleSuggestionClick(s.id)}
-                      className="px-4 py-2 hover:bg-surface-container-highest cursor-pointer flex items-center justify-between group rounded"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined text-sm ${s.type === 'BH' ? 'text-primary' : s.type === 'CPT' ? 'text-secondary' : 'text-tertiary'}`}>
-                          {s.type === 'BH' ? 'trip_origin' : s.type === 'CPT' ? 'diamond' : 'pentagon'}
-                        </span>
-                        <div>
-                          <p className="text-sm font-bold text-on-surface group-hover:text-secondary transition-colors">{s.id}</p>
-                          <p className="text-[10px] text-on-surface-variant">Section {s.section}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/10">
-                         {s.targetDepth}m
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setIsDark(!isDark)}
-            className="p-2 text-primary hover:bg-surface-container-high rounded-full transition-colors"
-            title="Toggle Light/Dark Theme"
-          >
-            <span className="material-symbols-outlined">{isDark ? 'light_mode' : 'dark_mode'}</span>
-          </button>
-          <button className="p-2 text-primary hover:bg-surface-container-high rounded-full transition-colors relative">
-            <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full"></span>
-          </button>
-          <button className="p-2 text-primary hover:bg-surface-container-high rounded-full transition-colors">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
-          <div className="h-8 w-8 rounded-full bg-surface-container-highest border border-outline-variant/30 flex items-center justify-center text-xs font-bold text-secondary">
-            MA
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-1 overflow-hidden font-inter border-t border-white/5">
+      {/* Mobile overlay */}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* SideNavBar */}
-      <aside className="bg-surface-container-low fixed left-0 top-0 h-full z-40 border-r border-outline-variant/10 w-64 pt-28 flex flex-col">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center border border-outline-variant/20">
-            <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>precision_manufacturing</span>
-          </div>
-          <div>
-            <h3 className="text-primary text-sm font-bold font-headline tracking-wider">Qiddiya Coastal</h3>
-            <p className="text-[10px] text-on-primary-container uppercase tracking-widest">GI Survey</p>
-          </div>
+      <aside className={`bg-surface-container-low h-full z-40 border-r border-outline-variant/10 w-64 flex flex-col shrink-0 fixed lg:relative inset-y-0 left-0 transform transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="p-6 border-b border-white/5">
+           <button 
+             onClick={() => navigate('/')}
+             className="flex items-center gap-2 text-[10px] font-bold text-primary hover:text-white uppercase tracking-widest mb-6 transition-colors"
+           >
+             <span className="material-symbols-outlined text-sm">arrow_back</span>
+             Back to Portfolio
+           </button>
+           
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center border border-primary/20">
+                <span className="material-symbols-outlined text-primary">analytics</span>
+              </div>
+              <div className="overflow-hidden">
+                <h3 className="text-white text-xs font-bold font-headline tracking-wider truncate">{project.name}</h3>
+                <p className="text-[9px] text-on-primary-container/40 uppercase tracking-widest truncate">{project.client}</p>
+              </div>
+           </div>
         </div>
 
-        <nav className="flex-1 mt-4">
+        <nav className="flex-1 mt-4 overflow-y-auto custom-scrollbar">
           <ul className="space-y-1">
             {navItems.map(item => (
               <li key={item.to} className="px-4">
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `flex items-center gap-4 px-4 py-3 text-xs font-medium uppercase tracking-[0.05em] transition-all duration-200 ${
+                    `flex items-center gap-4 px-4 py-3 text-xs font-medium uppercase tracking-[0.05em] transition-all duration-200 rounded-xl ${
                       isActive
-                        ? 'text-secondary border-r-4 border-secondary bg-surface-container-high/50'
-                        : 'text-on-primary-container hover:bg-surface-container-high hover:text-on-surface'
+                        ? 'text-white bg-primary shadow-[0_5px_15px_rgba(100,161,238,0.2)]'
+                        : 'text-on-primary-container/70 hover:bg-surface-container-high hover:text-primary'
                     }`
                   }
                 >
@@ -170,32 +138,97 @@ export default function Layout() {
           </ul>
         </nav>
 
-        <div className="p-6 border-t border-outline-variant/10">
-          <NavLink to="/data" className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:brightness-110 transition-all active:scale-95 text-sm">
-            <span className="material-symbols-outlined text-sm">upload</span>
-            Upload Data
-          </NavLink>
-          <ul className="mt-6 space-y-4">
+        <div className="p-6 border-t border-outline-variant/10 bg-surface-container-low/50">
+          <div className="glass-panel p-4 rounded-xl border border-white/5 mb-4">
+            <p className="text-[9px] font-bold text-on-primary-container/40 uppercase tracking-widest mb-2">Project Manager</p>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center text-[8px] font-bold text-secondary">AM</div>
+              <span className="text-[10px] font-bold text-white uppercase tracking-tight">Admin Master</span>
+            </div>
+          </div>
+          
+          <ul className="space-y-4">
             <li>
-              <a className="flex items-center gap-4 text-on-primary-container hover:text-on-surface transition-colors text-xs font-medium uppercase tracking-[0.05em]" href="#">
-                <span className="material-symbols-outlined text-sm">help</span>
-                <span>Support</span>
-              </a>
-            </li>
-            <li>
-              <a className="flex items-center gap-4 text-on-primary-container hover:text-on-surface transition-colors text-xs font-medium uppercase tracking-[0.05em]" href="#">
-                <span className="material-symbols-outlined text-sm">archive</span>
-                <span>Archive</span>
+              <a className="flex items-center gap-4 text-on-primary-container/50 hover:text-on-surface transition-colors text-[10px] font-bold uppercase tracking-widest group" href="#">
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/10">
+                  <span className="material-symbols-outlined text-sm">help</span>
+                </div>
+                <span>Help Center</span>
               </a>
             </li>
           </ul>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="ml-64 pt-28 flex-1 h-screen overflow-hidden flex flex-col">
-        <Outlet />
-      </main>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden relative p-2 sm:p-4">
+        {/* Project Sub-Header (Search/Theme/TextSize) */}
+        <div className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-surface-container-low shadow-sm shrink-0 rounded-t-2xl">
+          <div className="relative w-96" ref={searchRef}>
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container/50 text-sm">search</span>
+            <input
+              className="w-full bg-surface-container border border-outline-variant/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-on-primary-container/30"
+              placeholder={`Search in ${project.name}...`}
+              type="text"
+              value={searchQuery}
+              onChange={handleSearchInput}
+              onFocus={() => { if (searchQuery.length > 0) setShowSuggestions(true) }}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-11 left-0 w-full bg-surface-container-high border border-outline-variant/20 shadow-2xl rounded-xl overflow-hidden z-[1000] animate-in slide-in-from-top-2 duration-200">
+                <ul className="max-h-64 overflow-y-auto custom-scrollbar p-1">
+                  {suggestions.map(s => (
+                    <li 
+                      key={s.id}
+                      onClick={() => handleSuggestionClick(s.id)}
+                      className="px-4 py-2 hover:bg-primary/10 cursor-pointer flex items-center justify-between group rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-sm ${s.type === 'BH' ? 'text-primary' : s.type === 'CPT' ? 'text-secondary' : 'text-tertiary'}`}>
+                          {s.type === 'BH' ? 'trip_origin' : s.type === 'CPT' ? 'diamond' : 'pentagon'}
+                        </span>
+                        <div>
+                          <p className="text-xs font-bold text-white group-hover:text-primary transition-colors">{s.id}</p>
+                          <p className="text-[9px] text-on-primary-container/40">Section {s.section}</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-mono text-on-primary-container/60 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                         {s.targetDepth}m
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+             {/* Mobile Menu Toggle */}
+             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-10 h-10 rounded-xl bg-surface-container border border-white/5 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all lg:hidden">
+               <span className="material-symbols-outlined text-lg">menu</span>
+             </button>
+
+             {/* Text Size Controls */}
+             <div className="hidden sm:flex items-center gap-1 bg-surface-container rounded-xl border border-white/5 p-1">
+               <button onClick={() => setTextSizeIdx(Math.max(0, textSizeIdx - 1))} className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-on-primary-container/60 hover:bg-white/10 transition-all" title="Decrease text size">A-</button>
+               <span className="text-[9px] font-mono text-on-primary-container/40 px-1">{TEXT_SIZES[textSizeIdx]}px</span>
+               <button onClick={() => setTextSizeIdx(Math.min(TEXT_SIZES.length - 1, textSizeIdx + 1))} className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-on-primary-container/60 hover:bg-white/10 transition-all" title="Increase text size">A+</button>
+             </div>
+
+             <div className="hidden md:flex flex-col items-end mr-2">
+               <p className="text-[9px] font-extrabold text-on-primary-container/40 uppercase tracking-widest leading-none">Project Status</p>
+               <p className="text-[10px] font-bold text-secondary uppercase tracking-tight mt-1">On Schedule</p>
+             </div>
+             <button onClick={() => setIsDark(!isDark)} className="w-10 h-10 rounded-xl bg-surface-container border border-white/5 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
+                <span className="material-symbols-outlined text-lg">{isDark ? 'light_mode' : 'dark_mode'}</span>
+             </button>
+          </div>
+        </div>
+
+        <main className="flex-1 overflow-hidden flex flex-col relative z-0">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

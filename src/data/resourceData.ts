@@ -22,6 +22,7 @@ export interface Asset {
   calibrationDueDate: string | null;
   conditionRemark: string;
   currentPosition?: string; // Point ID or 'Idle'
+  status?: 'Active' | 'Maintenance' | 'Idle' | 'N/A';
 }
 
 export const initialPersonnels: Personnel[] = [

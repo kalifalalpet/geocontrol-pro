@@ -9,6 +9,7 @@ import {
   Expense, Invoice, BOQ_RATES, InvoiceItem
 } from '../data/financeData'
 import { allSitePoints } from '../data/sampleData'
+import { useProjects } from '../context/ProjectContext'
 
 // Helper component for SVG Gauge
 function BurnGauge({ spent, allocated, color, name }: { spent: number, allocated: number, color: string, name: string }) {
@@ -31,6 +32,7 @@ function BurnGauge({ spent, allocated, color, name }: { spent: number, allocated
 }
 
 export default function FinancialDashboardPage() {
+  const { activeProject } = useProjects()
   const [activeTab, setActiveTab] = useState<'overview' | 'budget' | 'invoices' | 'expenses'>('overview')
 
   // Core State
@@ -159,8 +161,8 @@ export default function FinancialDashboardPage() {
   }
 
   // Derived Financial KPIs
-  const totalBudget = useMemo(() => budgets.reduce((acc, b) => acc + b.allocated, 0), [budgets])
-  const totalSpent = useMemo(() => budgets.reduce((acc, b) => acc + b.spent, 0), [budgets])
+  const totalBudget = useMemo(() => activeProject?.budgetSAR || budgets.reduce((acc, b) => acc + b.allocated, 0), [activeProject, budgets])
+  const totalSpent = useMemo(() => activeProject?.spentSAR || budgets.reduce((acc, b) => acc + b.spent, 0), [activeProject, budgets])
   const budgetUtilization = Math.round((totalSpent / totalBudget) * 100)
 
   const totalBilled = useMemo(() => invoices.reduce((acc, inv) => acc + inv.amount, 0), [invoices])
@@ -252,7 +254,7 @@ export default function FinancialDashboardPage() {
             <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/20">
               <span className="text-on-surface-variant text-xs font-bold uppercase tracking-widest">Master Budget</span>
               <div className="text-3xl font-headline font-bold text-primary mt-2">{formatCurrency(totalBudget)}</div>
-              <div className="text-xs text-on-surface-variant mt-2">Planned capital for Qiddiya</div>
+              <div className="text-xs text-on-surface-variant mt-2">Planned capital for {activeProject?.name || 'Project'}</div>
             </div>
             <div className="bg-surface-container-low p-6 rounded-2xl border border-outline-variant/20">
               <span className="text-on-surface-variant text-xs font-bold uppercase tracking-widest">Total Spent</span>

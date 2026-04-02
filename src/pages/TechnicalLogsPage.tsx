@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { cptData, pltData, lithologyLayers, allSitePoints, type SitePoint } from '../data/sampleData'
+import { useProjects } from '../context/ProjectContext'
+import SiceBoreholeLog from '../components/SiceBoreholeLog'
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
@@ -168,6 +170,9 @@ function PLTCard({ point }: { point: SitePoint }) {
 }
 
 function PointVisualizer({ point, testType }: { point: SitePoint, testType: string }) {
+  const { getBoreholeLog } = useProjects()
+  const boreholeLog = getBoreholeLog(point.id)
+
   const showAll = testType === 'ALL'
   const hasLithology = point.type === 'BH'
   const hasCPT = point.type === 'CPT'
@@ -176,7 +181,7 @@ function PointVisualizer({ point, testType }: { point: SitePoint, testType: stri
   return (
     <div className="mb-16">
       <div className="flex items-center gap-4 mb-6">
-        <h2 className="text-2xl font-headline font-bold text-primary">
+        <h2 className="text-2xl font-headline font-bold text-white">
           Data Viewer: {point.id}
         </h2>
         <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
@@ -187,7 +192,15 @@ function PointVisualizer({ point, testType }: { point: SitePoint, testType: stri
         <div className="flex-1 h-px bg-white/10 ml-4"></div>
       </div>
       
-      {(showAll || testType === 'Lithology') && hasLithology && <LithologyCard point={point} />}
+      {(showAll || testType === 'Lithology') && hasLithology && (
+        boreholeLog ? (
+          <div className="mb-8">
+            <SiceBoreholeLog log={boreholeLog} />
+          </div>
+        ) : (
+          <LithologyCard point={point} />
+        )
+      )}
       {(showAll || testType === 'CPT') && hasCPT && <CPTCard point={point} />}
       {(showAll || testType === 'PLT') && hasPLT && <PLTCard point={point} />}
 
@@ -231,15 +244,15 @@ export default function TechnicalLogsPage() {
   }, [urlIds, filteredPoints])
 
   const selectedPoints = useMemo(() => {
-    return pointIds.map(id => allSitePoints.find(p => p.id === id)).filter(Boolean) as SitePoint[]
+    return pointIds.map((id: string) => allSitePoints.find(p => p.id === id)).filter(Boolean) as SitePoint[]
   }, [pointIds])
 
   // Aggregate all tests across all currently selected points
   const aggregatedTests = useMemo(() => {
     const testMap = new Map<string, number>()
-    selectedPoints.forEach(p => {
+    selectedPoints.forEach((p: SitePoint) => {
       if (p.type === 'BH' && !testMap.has('Lithology')) testMap.set('Lithology', 1)
-      p.tests.forEach(t => {
+      p.tests.forEach((t: {name: string, count: number}) => {
         if (!testMap.has(t.name)) testMap.set(t.name, t.count)
       })
     })
@@ -274,7 +287,7 @@ export default function TechnicalLogsPage() {
           <div className="px-4 py-2 border-r border-outline-variant/20">
             <label className="block text-[10px] text-on-primary-container uppercase font-bold tracking-widest mb-2">Filter Type</label>
             <div className="flex bg-surface-container-high rounded p-0.5">
-              {['ALL', 'BH', 'CPT', 'PLT'].map(t => (
+              {['ALL', 'BH', 'CPT', 'PLT'].map((t: string) => (
                 <button
                   key={t}
                   onClick={() => { setPointType(t as any); setSearchParams({}) }} // Clear URL params if manually filtering
@@ -302,7 +315,7 @@ export default function TechnicalLogsPage() {
                 onChange={e => { setPointIds([e.target.value]); setSearchParams({}); }}
                 className="bg-surface-container-high text-primary text-xs font-bold border border-outline-variant/20 rounded px-2 py-1 cursor-pointer focus:outline-none focus:border-secondary"
               >
-                {filteredPoints.slice(0, 100).map(p => <option key={p.id} value={p.id}>{p.id} ({p.section})</option>)}
+                {filteredPoints.slice(0, 100).map((p: SitePoint) => <option key={p.id} value={p.id}>{p.id} ({p.section})</option>)}
               </select>
             )}
           </div>
@@ -320,7 +333,7 @@ export default function TechnicalLogsPage() {
               >
                 ALL TESTS
               </button>
-              {aggregatedTests.map(t => (
+              {aggregatedTests.map((t: {name: string, count: number}) => (
                 <button
                   key={t.name}
                   onClick={() => setTestType(t.name)}
@@ -340,7 +353,7 @@ export default function TechnicalLogsPage() {
 
       {/* DYNAMIC RENDERING AREA (Maps over all selected points concurrently) */}
       <div className="grid grid-cols-1 xl:grid-cols-1 gap-8">
-        {selectedPoints.map(pt => (
+        {selectedPoints.map((pt: SitePoint) => (
           <PointVisualizer key={pt.id} point={pt} testType={testType} />
         ))}
       </div>

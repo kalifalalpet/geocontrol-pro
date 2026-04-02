@@ -1,42 +1,52 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { allSitePoints } from '../data/sampleData'
+import { useProjects } from '../context/ProjectContext'
+import { AGSParser } from '../utils/AGSParser'
+import { BoreholeLog, LithologyLayer, SPTDataPoint } from '../types/enterprise'
+import SiceBoreholeLog from '../components/SiceBoreholeLog'
 
 export default function DataHubPage() {
   const navigate = useNavigate()
+  const { activeProject, addBoreholeLog, boreholeLogs } = useProjects()
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<'ai' | 'survey'>('ai')
+  const [activeTab, setActiveTab] = useState<'ai' | 'survey' | 'sice'>('sice')
 
-  // Extract Stats
-  const [extractScope, setExtractScope] = useState('all')
-  const [extractFormat, setExtractFormat] = useState('excel')
-  
-  // Update Flow States
+  // --- AI TAB STATES ---
   const [selectedSection, setSelectedSection] = useState('Section 1')
   const [selectedType, setSelectedType] = useState('BH')
   const [selectedPointId, setSelectedPointId] = useState('')
   const [proposedDepth, setProposedDepth] = useState<number | null>(null)
   const [actualDepth, setActualDepth] = useState<string>('')
-  
-  // File Upload & AI Simulation States
   const [dragActive, setDragActive] = useState(false)
   const [uploadState, setUploadState] = useState<'idle' | 'processing' | 'success'>('idle')
   const [processingLogs, setProcessingLogs] = useState<string[]>([])
 
-  // Available points based on type + section filter
+  // --- SURVEY TAB STATES ---
+  const [surveyFilter, setSurveyFilter] = useState('all')
+  const [surveyTypeFilter, setSurveyTypeFilter] = useState('all')
+  const [surveySearch, setSurveySearch] = useState('')
+  const [, setForceTrigger] = useState(0)
+
+  // --- SICE TAB STATES ---
+  const [isDraggingSice, setIsDraggingSice] = useState(false)
+  const [extractedLogs, setExtractedLogs] = useState<Partial<BoreholeLog>[]>([])
+  const [selectedLog, setSelectedLog] = useState<BoreholeLog | null>(null)
+  const [showValidation, setShowValidation] = useState(false)
+  const [editingLog, setEditingLog] = useState<Partial<BoreholeLog> | null>(null)
+
+  // Filtering for AI tab
   const filteredPoints = allSitePoints.filter(p => p.type === selectedType && (selectedSection === 'all' || p.section === selectedSection))
   
   useEffect(() => {
-    // Reset selection if list changes
     if (filteredPoints.length > 0 && !filteredPoints.find(p => p.id === selectedPointId)) {
       setSelectedPointId(filteredPoints[0].id)
     }
-  }, [selectedType, selectedSection, filteredPoints])
+  }, [selectedType, selectedSection, filteredPoints, selectedPointId])
 
   useEffect(() => {
-    // Auto-populate depth when point changes
     const pt = allSitePoints.find(p => p.id === selectedPointId)
     if (pt) {
       setProposedDepth(pt.targetDepth)
@@ -44,6 +54,7 @@ export default function DataHubPage() {
     }
   }, [selectedPointId])
 
+  // --- SHARED UTILS ---
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -51,10 +62,10 @@ export default function DataHubPage() {
     else if (e.type === 'dragleave') setDragActive(false)
   }
 
+  // --- AI TAB LOGIC ---
   const simulateProcessing = () => {
     setUploadState('processing')
     setProcessingLogs([])
-    
     const logs = [
       "Analyzing PDF Layout & Metadata...",
       "Extracting Tabular Log Data...",
@@ -64,7 +75,6 @@ export default function DataHubPage() {
       "A.I. Confidence Check Passed (98%).",
       "Injecting Data into Visualizer Core..."
     ]
-    
     let step = 0;
     const interval = setInterval(() => {
       if (step < logs.length) {
@@ -73,36 +83,15 @@ export default function DataHubPage() {
       } else {
         clearInterval(interval)
         setUploadState('success')
-        setTimeout(() => {
-          navigate(`/logs?ids=${selectedPointId}`)
-        }, 1500)
+        setTimeout(() => { navigate(`/project/${activeProject?.id}/logs?ids=${selectedPointId}`) }, 1500)
       }
     }, 800)
   }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0]
-      if (file.name.toLowerCase().endsWith('.pdf')) {
-        simulateProcessing()
-      } else {
-        alert("Please upload a PDF Log Report.")
-      }
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0]
-      if (file.name.toLowerCase().endsWith('.pdf')) {
-        simulateProcessing()
-      } else {
-        alert("Please upload a PDF Log Report.")
-      }
-    }
+  const handleAIDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setDragActive(false);
+    if (e.dataTransfer.files?.[0]?.name.toLowerCase().endsWith('.pdf')) simulateProcessing()
+    else alert("Please upload a PDF Log Report.")
   }
 
   const downloadOriginalData = () => {
@@ -115,18 +104,12 @@ export default function DataHubPage() {
     }
   }
 
-  const [surveyFilter, setSurveyFilter] = useState('all')
-  const [surveyTypeFilter, setSurveyTypeFilter] = useState('all')
-  const [surveySearch, setSurveySearch] = useState('')
-
-  // Because allSitePoints is a mutable array imported from sampleData, we need a local state trigger to force re-render when we mutate it.
-  const [, setForceTrigger] = useState(0)
-
-  const handleStatusChange = (id: string, newStatus: 'marked'|'unmarked'|'cancelled') => {
+  // --- SURVEY TAB LOGIC ---
+  const handleStatusChange = (id: string, newStatus: 'marked' | 'unmarked' | 'cancelled') => {
     const pt = allSitePoints.find(p => p.id === id)
     if (pt) {
       if (newStatus === 'marked' && (!pt.actualEasting || !pt.actualNorthing || !pt.elevation)) {
-        alert(`Action Denied: ${id} cannot be set to "Marked" without Actual Easting, Actual Northing, and Elevation. Please fill these in first.`)
+        alert(`Action Denied: ${id} cannot be set to "Marked" without Actual Coordinates.`)
         return
       }
       pt.surveyStatus = newStatus
@@ -134,49 +117,21 @@ export default function DataHubPage() {
     }
   }
 
-  const handleElevationChange = (id: string, newElevation: string) => {
-    const pt = allSitePoints.find(p => p.id === id)
-    if (pt) {
-      pt.elevation = parseFloat(newElevation) || 0
-      setForceTrigger(t => t + 1)
-    }
-  }
-  const handleActualCoordChange = (id: string, field: 'actualEasting' | 'actualNorthing', value: string) => {
-    const pt = allSitePoints.find(p => p.id === id)
+  const handleSurveyCoordChange = (id: string, field: string, value: string) => {
+    const pt = allSitePoints.find(p => p.id === id) as any
     if (pt) {
       pt[field] = parseFloat(value) || 0
-      setForceTrigger(t => t + 1)
+      setForceTrigger((t: number) => t + 1)
     }
-  }
-
-  const downloadSurveyTemplate = () => {
-    const headers = ["Point ID", "Actual Easting", "Actual Northing", "Elevation"]
-    const rows = allSitePoints.map(p => [
-      p.id, 
-      p.actualEasting ? p.actualEasting.toFixed(4) : '', 
-      p.actualNorthing ? p.actualNorthing.toFixed(4) : '', 
-      p.elevation ? p.elevation.toFixed(4) : ''
-    ])
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n")
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.setAttribute("href", url)
-    link.setAttribute("download", "SURVEY_ACTUALS_TEMPLATE.csv")
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
   }
 
   const handleSurveyUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     const reader = new FileReader()
     reader.onload = (event) => {
       const text = event.target?.result as string
       const lines = text.split("\n")
-      // Skip header
       for (let i = 1; i < lines.length; i++) {
         const [id, eCoord, nCoord, elev] = lines[i].split(",").map(s => s.trim())
         if (!id) continue
@@ -187,17 +142,10 @@ export default function DataHubPage() {
           if (elev) pt.elevation = parseFloat(elev)
         }
       }
-      setForceTrigger(t => t + 1)
-      alert("Survey data updated successfully.")
+      setForceTrigger((t: number) => t + 1)
+      alert("Survey data updated.")
     }
     reader.readAsText(file)
-  }
-
-  const calculateDelta = (p: typeof allSitePoints[0]) => {
-    if (!p.actualEasting || !p.actualNorthing) return null
-    const de = p.actualEasting - p.easting
-    const dn = p.actualNorthing - p.northing
-    return Math.sqrt(de * de + dn * dn).toFixed(4)
   }
 
   const surveyList = allSitePoints.filter(p => {
@@ -207,353 +155,409 @@ export default function DataHubPage() {
     return true
   })
 
+  // --- SICE TAB LOGIC ---
+  const handleSiceFile = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target?.result as string
+      const logs = AGSParser.parse(content)
+      if (logs.length > 0) {
+        setExtractedLogs(logs)
+        setShowValidation(true)
+      } else {
+        alert("No valid AGS/CSV data found in file.")
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const onSiceDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setIsDraggingSice(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleSiceFile(file)
+  }, [])
+
+  const confirmSiceUpload = (log: Partial<BoreholeLog>) => {
+    if (!log.boreholeId || !activeProject) return
+    
+    // Construct final log with mandatory fields
+    const finalLog: BoreholeLog = {
+      ...log,
+      id: `${activeProject.id}_${log.boreholeId}_${Date.now()}`, // Ensure unique ID
+      projectId: activeProject.id,
+      projectName: activeProject.name,
+      location: log.location || { easting: 0, northing: 0, elevation: 0 },
+      lithology: log.lithology || [],
+      sptResults: log.sptResults || [],
+      totalDepth: log.totalDepth || 0,
+      method: log.method || 'Unknown'
+    } as BoreholeLog
+
+    addBoreholeLog(finalLog)
+    
+    // Remove from extraction list
+    setExtractedLogs(prev => {
+      const remaining = prev.filter(l => l.boreholeId !== log.boreholeId)
+      if (remaining.length === 0) setShowValidation(false)
+      return remaining
+    })
+    
+    setEditingLog(null)
+    // Auto-select the newly added log for visualization!
+    setSelectedLog(finalLog)
+    console.log('[DataHub] Borehole log confirmed and selected:', finalLog.boreholeId)
+  }
+
+  const updateEditingLog = (field: string, value: any) => {
+    if (!editingLog) return
+    setEditingLog({ ...editingLog, [field]: value })
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-surface text-on-surface flex flex-col">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-background custom-scrollbar text-white">
       
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-headline font-bold text-primary tracking-tight flex items-center gap-3">
-          <span className="material-symbols-outlined text-4xl text-tertiary">document_scanner</span>
-          A.I. Extractor & Data Hub
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-3xl font-headline font-extrabold flex items-center gap-3 sm:gap-4">
+          <span className="material-symbols-outlined text-2xl sm:text-4xl text-primary">hub</span>
+          Data Intelligence Hub
         </h1>
-        <p className="text-sm text-on-surface-variant max-w-2xl mt-2">
-          Update existing project map points by uploading raw PDF reports, or manage the Master Survey tracking matrix for the 306 core points.
+        <p className="text-[10px] sm:text-sm text-on-primary-container/60 mt-2 uppercase tracking-widest font-bold">
+          {activeProject?.name} — Unified Subsurface Data Management
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-8 border-b border-outline-variant/10 pb-4">
-        <button 
-          onClick={() => setActiveTab('ai')}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'ai' ? 'bg-tertiary text-on-tertiary shadow-[0_4px_14px_rgba(78,222,163,0.3)]' : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'}`}
-        >
-          <span className="material-symbols-outlined text-lg">auto_fix_high</span> A.I. Extraction Flow
-        </button>
-        <button 
-          onClick={() => setActiveTab('survey')}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'survey' ? 'bg-primary text-on-primary shadow-[0_4px_14px_rgba(190,198,224,0.3)]' : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'}`}
-        >
-          <span className="material-symbols-outlined text-lg">radar</span> Survey
-        </button>
+      {/* Navigation Tabs */}
+      <div className="flex flex-wrap gap-2 sm:gap-4 mb-6 sm:mb-10 border-b border-white/5 pb-4 sm:pb-6">
+        {[
+          { id: 'sice', label: 'Geotechnical Engine', icon: 'settings_suggest', color: 'primary' },
+          { id: 'survey', label: 'Survey Progress', icon: 'radar', color: 'secondary' },
+          { id: 'ai', label: 'A.I. Extractor', icon: 'auto_fix_high', color: 'tertiary' }
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 sm:gap-3 ${
+              activeTab === tab.id 
+              ? `bg-${tab.color} text-white shadow-lg shadow-${tab.color}/20` 
+              : 'bg-surface-container hover:bg-white/5 text-on-primary-container/60'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base sm:text-lg">{tab.icon}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+          </button>
+        ))}
       </div>
 
-      {activeTab === 'ai' && (
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        
-        {/* COLUMN 1: Update Existing Workflow */}
-        <div className="bg-surface-container-low rounded-2xl relative overflow-hidden border border-outline-variant/20 shadow-xl flex flex-col">
-          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-tertiary to-transparent"></div>
-          
-          <div className="p-8">
-            <h2 className="text-xl font-headline font-bold text-primary mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-tertiary">auto_fix_high</span>
-              Update Existing Point Data
-            </h2>
-
-            {/* Selection Matrix */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
-              <div>
-                <label className="block text-[10px] text-on-primary-container uppercase font-bold tracking-widest mb-2">Project Section</label>
-                <select 
-                  value={selectedSection} 
-                  onChange={e => setSelectedSection(e.target.value)}
-                  className="w-full bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-3 py-2.5 focus:outline-none focus:border-tertiary transition-colors"
-                >
-                  <option value="all">Global Search (All Sites)</option>
-                  <option value="Section 1">Section 1</option>
-                  <option value="Section 2">Section 2</option>
-                  <option value="Section 3A">Section 3A</option>
-                  <option value="Section 3B">Section 3B</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-[10px] text-on-primary-container uppercase font-bold tracking-widest mb-2">Location Type</label>
-                <select 
-                  value={selectedType} 
-                  onChange={e => setSelectedType(e.target.value)}
-                  className="w-full bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-3 py-2.5 focus:outline-none focus:border-tertiary transition-colors"
-                >
-                  <option value="BH">Borehole (BH)</option>
-                  <option value="CPT">CPT Profiling</option>
-                  <option value="PLT">Plate Load Test (PLT)</option>
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-[10px] text-on-primary-container uppercase font-bold tracking-widest mb-2">Select Target ID (Existing)</label>
-                <select 
-                  value={selectedPointId} 
-                  onChange={e => setSelectedPointId(e.target.value)}
-                  className="w-full bg-surface-container-high text-primary font-bold text-sm border border-outline-variant/20 rounded-lg px-3 py-2.5 focus:outline-none focus:border-tertiary transition-colors"
-                >
-                  {filteredPoints.length > 0 ? filteredPoints.map(p => (
-                    <option key={p.id} value={p.id}>{p.id} ({p.section})</option>
-                  )) : (
-                    <option value="" disabled>No points found for criteria</option>
-                  )}
-                </select>
-                <div className="mt-2 text-[10px] text-error flex items-center gap-1 font-bold">
-                  <span className="material-symbols-outlined text-[12px]">info</span> You cannot create new points. You can only reconcile and update existing mapped points.
-                </div>
-              </div>
-            </div>
-
-            {/* Depth Reconciliation */}
-            <div className="bg-surface-container-highest/20 rounded-xl p-6 border border-outline-variant/10 mb-8">
-              <h3 className="text-sm font-bold text-primary font-headline uppercase tracking-wider mb-4 border-b border-outline-variant/10 pb-2">Depth Reconciliation</h3>
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] text-on-primary-container uppercase tracking-widest mb-2">Proposed Depth (m)</label>
-                  <div className="w-full bg-surface-container-highest/50 text-on-surface-variant text-sm border border-outline-variant/10 rounded-lg px-3 py-2 cursor-not-allowed font-mono">
-                    {proposedDepth ?? 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-tertiary font-bold uppercase tracking-widest mb-2">Actual Drilled Depth (m)</label>
-                  <input 
-                    type="number" 
-                    value={actualDepth}
-                    onChange={e => setActualDepth(e.target.value)}
-                    step="0.1"
-                    className="w-full bg-surface-container-high text-primary font-bold text-sm border border-outline-variant/20 rounded-lg px-3 py-2 focus:outline-none focus:border-tertiary transition-colors font-mono"
-                    placeholder="Override depth..."
-                  />
-                </div>
-              </div>
-              {parseFloat(actualDepth) !== proposedDepth && proposedDepth !== null && (
-                <div className="mt-3 text-[10px] text-secondary font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[12px]">warning</span> Discrepancy detected. Actual depth will override master plan up upload.
-                </div>
-              )}
-            </div>
-
-            {/* Smart Upload Zone */}
-            {uploadState === 'idle' ? (
+      {/* --- SICE TAB CONTENT --- */}
+      {activeTab === 'sice' && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+           <div className="xl:col-span-1 space-y-8">
               <div 
-                className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-8 transition-all ${dragActive ? 'border-tertiary bg-tertiary/5 scale-[1.02]' : 'border-outline-variant/20 bg-surface-container/30 hover:border-tertiary/50 hover:bg-surface-container/50'}`}
-                onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingSice(true) }}
+                onDragLeave={() => setIsDraggingSice(false)}
+                onDrop={onSiceDrop}
+                className={`relative h-64 rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-8 text-center group ${
+                  isDraggingSice ? 'border-primary bg-primary/5' : 'border-white/5 hover:border-primary/20 hover:bg-white/5'
+                }`}
               >
-                <div className={`p-4 rounded-full mb-3 ${dragActive ? 'bg-tertiary text-on-tertiary shadow-[0_0_15px_rgba(78,222,163,0.4)]' : 'bg-surface-container-high text-primary'}`}>
-                  <span className="material-symbols-outlined text-3xl">picture_as_pdf</span>
+                <input type="file" accept=".ags,.csv,.txt" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => e.target.files?.[0] && handleSiceFile(e.target.files[0])} />
+                <div className="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4 text-primary">
+                  <span className="material-symbols-outlined text-3xl">upload_file</span>
                 </div>
-                <h3 className="text-sm font-bold text-primary mb-1">Drag {selectedPointId}.pdf here</h3>
-                <p className="text-xs text-on-surface-variant text-center mb-6">
-                  System will automatically extract table strata, graphs, and sensors using local A.I. inference.
+                <h4 className="text-sm font-bold mb-2">Upload AGS / CSV Data</h4>
+                <p className="text-[10px] text-on-primary-container/40 uppercase tracking-widest leading-relaxed">
+                  Extracts Boreholes, Coordinates, <br /> Lithology and SPT automatically
                 </p>
-                <label className="bg-tertiary/10 text-tertiary border border-tertiary/20 px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-tertiary/20 transition-colors flex items-center gap-2">
-                  <span className="material-symbols-outlined text-sm">upload</span> Browse PDF
-                  <input type="file" className="hidden" accept=".pdf" onChange={handleFileSelect}/>
-                </label>
               </div>
-            ) : uploadState === 'processing' ? (
-              <div className="bg-surface-container-highest/20 rounded-xl p-8 border border-outline-variant/10 text-center relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-tertiary animate-pulse"></div>
-                <span className="material-symbols-outlined text-5xl text-tertiary animate-spin mb-4" style={{ animationDuration: '3s' }}>hourglass_empty</span>
-                <h3 className="text-lg font-bold text-primary mb-4">A.I. Engine Processing...</h3>
-                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar text-left bg-surface p-4 rounded-lg font-mono text-[10px] text-on-surface-variant">
-                  {processingLogs.map((log, i) => (
-                    <div key={i} className="flex gap-2 items-center animate-in fade-in slide-in-from-bottom-2">
-                      <span className="text-tertiary">❯</span> {log}
+
+              <div className="glass-panel rounded-3xl border border-white/5 p-8">
+                <h4 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-6">Master Borehole Logs</h4>
+                <div className="space-y-3">
+                  {boreholeLogs.filter(l => l.projectId === activeProject?.id).map(log => (
+                    <div key={log.id} onClick={() => setSelectedLog(log)} className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedLog?.id === log.id ? 'bg-primary/10 border-primary shadow-lg shadow-primary/10' : 'bg-white/5 border-transparent text-on-primary-container/60 hover:bg-white/10'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold font-mono">{log.boreholeId}</span>
+                        <span className="text-[9px] uppercase tracking-widest font-bold opacity-40">{log.totalDepth}m</span>
+                      </div>
+                      <div className="text-[9px] opacity-40 uppercase tracking-tighter">Method: {log.method}</div>
                     </div>
                   ))}
+                  <button 
+                    onClick={() => {
+                      setExtractedLogs([{ boreholeId: 'NEW-BH', location: { easting: 0, northing: 0, elevation: 0 }, lithology: [], sptResults: [] }])
+                      setShowValidation(true)
+                    }}
+                    className="w-full mt-4 py-3 rounded-xl border border-dashed border-white/10 text-[10px] uppercase font-bold text-on-primary-container/40 hover:text-white hover:border-white/20 transition-all"
+                  >
+                    + Add New Log Manually
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="bg-tertiary/10 rounded-xl p-8 border border-tertiary/30 text-center animate-in zoom-in-95">
-                <span className="material-symbols-outlined text-5xl text-tertiary mb-2">check_circle</span>
-                <h3 className="text-lg font-bold text-tertiary font-headline mb-1">Extraction Successful</h3>
-                <p className="text-xs text-on-surface-variant mb-4">Data updated. Opening Visualizer automatically...</p>
-              </div>
-            )}
+           </div>
 
-          </div>
+           <div className="xl:col-span-2 space-y-8">
+              {showValidation && (
+                <div className="rounded-3xl border border-primary/20 p-4 sm:p-6 overflow-hidden" style={{ background: 'rgba(91,155,248,.04)' }}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h4 className="text-sm font-bold uppercase tracking-wider">AGS Data Verification</h4>
+                      <p className="text-[10px] text-primary font-bold uppercase tracking-widest mt-1">Review extracted data → Edit → Save to project</p>
+                    </div>
+                    <button onClick={() => setShowValidation(false)} className="text-white/20 hover:text-white"><span className="material-symbols-outlined">close</span></button>
+                  </div>
+
+                  <div className="space-y-6">
+                    {extractedLogs.map((log, i) => (
+                      <div key={i} className="rounded-2xl border border-white/5 p-4 sm:p-6 space-y-5" style={{ background: '#161c27' }}>
+                        
+                        {/* Project Metadata (extracted from PROJ group) */}
+                        {log.projectName && (
+                          <div className="flex flex-wrap gap-3 p-3 rounded-xl border border-white/5" style={{ background: 'rgba(91,155,248,.06)' }}>
+                            <div className="flex items-center gap-2 text-[10px]">
+                              <span className="material-symbols-outlined text-primary text-sm">folder</span>
+                              <span className="font-bold text-primary">{log.projectId}</span>
+                            </div>
+                            <div className="text-[10px] opacity-60">{log.projectName}</div>
+                            {log.projectLocation && <div className="text-[10px] opacity-40">📍 {log.projectLocation}</div>}
+                            {log.projectClient && <div className="text-[10px] opacity-40">Client: {log.projectClient}</div>}
+                          </div>
+                        )}
+
+                        {/* Core Fields */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                          <div>
+                            <label className="text-[8px] font-bold opacity-40 uppercase mb-1 block tracking-widest">BH ID (Link to Project)</label>
+                            <select 
+                              className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+                              value={log.boreholeId || ''}
+                              onChange={(e) => {
+                                const selectedId = e.target.value
+                                const pt = allSitePoints.find(p => p.id === selectedId)
+                                const newLogs = [...extractedLogs]
+                                newLogs[i] = { 
+                                  ...newLogs[i], 
+                                  boreholeId: selectedId,
+                                  // Auto-fill coordinates from project if available
+                                  location: pt ? {
+                                    easting: pt.actualEasting || pt.easting,
+                                    northing: pt.actualNorthing || pt.northing,
+                                    elevation: pt.elevation || 0
+                                  } : newLogs[i].location
+                                }
+                                setExtractedLogs(newLogs)
+                              }}
+                            >
+                              <option value="">Select ID...</option>
+                              {allSitePoints.filter(p => p.type === 'BH').map(p => (
+                                <option key={p.id} value={p.id}>{p.id}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold opacity-40 uppercase mb-1 block tracking-widest">Easting</label>
+                            <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+                              value={log.location?.easting || ''} 
+                              onChange={(e) => {
+                                const newLogs = [...extractedLogs]
+                                newLogs[i] = { ...newLogs[i], location: { ...newLogs[i].location!, easting: parseFloat(e.target.value) || 0 } }
+                                setExtractedLogs(newLogs)
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold opacity-40 uppercase mb-1 block tracking-widest">Northing</label>
+                            <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+                              value={log.location?.northing || ''}
+                              onChange={(e) => {
+                                const newLogs = [...extractedLogs]
+                                newLogs[i] = { ...newLogs[i], location: { ...newLogs[i].location!, northing: parseFloat(e.target.value) || 0 } }
+                                setExtractedLogs(newLogs)
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold opacity-40 uppercase mb-1 block tracking-widest">Elevation</label>
+                            <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+                              value={log.location?.elevation || ''}
+                              onChange={(e) => {
+                                const newLogs = [...extractedLogs]
+                                newLogs[i] = { ...newLogs[i], location: { ...newLogs[i].location!, elevation: parseFloat(e.target.value) || 0 } }
+                                setExtractedLogs(newLogs)
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold opacity-40 uppercase mb-1 block tracking-widest">Depth (m)</label>
+                            <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+                              value={log.totalDepth || ''}
+                              onChange={(e) => {
+                                const newLogs = [...extractedLogs]
+                                newLogs[i] = { ...newLogs[i], totalDepth: parseFloat(e.target.value) || 0 }
+                                setExtractedLogs(newLogs)
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-bold opacity-40 uppercase mb-1 block tracking-widest">Method</label>
+                            <input className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
+                              value={log.method || ''}
+                              onChange={(e) => {
+                                const newLogs = [...extractedLogs]
+                                newLogs[i] = { ...newLogs[i], method: e.target.value }
+                                setExtractedLogs(newLogs)
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Summary + Assign */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                          <div className="flex items-center gap-3 p-3 rounded-xl border border-white/5 flex-1" style={{ background: 'rgba(255,255,255,.03)' }}>
+                            <span className="material-symbols-outlined text-tertiary text-sm">inventory</span>
+                            <span className="text-[10px] font-bold opacity-60 uppercase tracking-widest">
+                              {log.lithology?.length || 0} Strata · {log.sptResults?.length || 0} SPT · {log.drilledDate || 'No date'}
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => confirmSiceUpload(log)}
+                            className="px-6 py-3 bg-primary text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:brightness-110 active:scale-95 transition-all whitespace-nowrap shrink-0"
+                          >
+                            ✓ Save & Visualize
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+
+              {selectedLog ? <SiceBoreholeLog log={selectedLog} /> : (
+                <div className="h-[600px] rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center p-12 bg-surface-container/30">
+                  <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 text-white/20"><span className="material-symbols-outlined text-4xl">analytics</span></div>
+                  <h4 className="text-lg font-bold mb-2">No visualization selected</h4>
+                  <p className="text-xs text-on-primary-container/40 max-w-xs uppercase tracking-widest font-bold">Select a borehole log or upload an AGS file.</p>
+                </div>
+              )}
+           </div>
         </div>
-
-        {/* COLUMN 2: Legacy Extraction (Optional tools) */}
-        <div className="flex flex-col gap-8">
-          
-          <div className="bg-surface-container-low rounded-2xl relative overflow-hidden border border-outline-variant/20 shadow-xl p-8">
-            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-secondary to-transparent"></div>
-            <h2 className="text-xl font-headline font-bold text-primary mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary">database</span>
-              Manual Record Download
-            </h2>
-            <p className="text-xs text-on-surface-variant mb-6">
-              Need to backup or view the actual raw parameters of {selectedPointId} before you override it with the new PDF? Download the existing record below.
-            </p>
-            <button 
-              onClick={downloadOriginalData}
-              className="w-full bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold py-3 rounded-xl border border-outline-variant/20 transition-all text-sm uppercase tracking-wider flex justify-center items-center gap-2"
-            >
-              <span className="material-symbols-outlined">download</span> Download Original XLSX
-            </button>
-          </div>
-
-          <div className="bg-surface-container-low rounded-2xl relative overflow-hidden border border-outline-variant/20 shadow-xl p-8 flex-1">
-             <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-error to-transparent"></div>
-             <h2 className="text-xl font-headline font-bold text-primary mb-2 flex items-center gap-2">
-              <span className="material-symbols-outlined text-error">gavel</span>
-              Compliance Logging
-            </h2>
-            <p className="text-xs text-on-surface-variant mb-4">
-              Our automated system cross-references all new PDF uploads against the Master Geotechnical Plan. Any detected depth disparities are automatically flagged in the Project ERP.
-            </p>
-            <div className="p-4 bg-error/10 border-l-4 border-error rounded-r-lg">
-              <p className="text-xs font-bold text-error">Warning: Audit Trails are permanently recorded. Ensure PDF uploaded is stamped and approved by Lead Inspector.</p>
-            </div>
-          </div>
-
-        </div>
-      </div>
       )}
 
+      {/* --- SURVEY TAB CONTENT --- */}
       {activeTab === 'survey' && (
-        <div className="bg-surface-container-low rounded-2xl relative border border-outline-variant/20 shadow-xl flex flex-col min-h-0 h-[75vh]">
-          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-primary to-transparent"></div>
-          
-          <div className="p-8 flex flex-col h-full min-h-0">
-            <h2 className="text-xl font-headline font-bold text-primary mb-2 flex items-center gap-2 shrink-0">
-              <span className="material-symbols-outlined text-primary">edit_location</span>
-              Survey Progress
-            </h2>
-            <p className="text-sm text-on-surface-variant mb-6 shrink-0">
-              Track and update physical site demarcations. Any status changed here instantly updates the Map Visualizer layer.
-            </p>
-
-            <div className="flex items-center gap-4 mb-6 shrink-0">
-              <input 
-                type="text" 
-                placeholder="Search Point ID (e.g. BH-020)..."
-                value={surveySearch}
-                onChange={e => setSurveySearch(e.target.value)}
-                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors flex-1"
-              />
-              <select 
-                value={surveyTypeFilter}
-                onChange={e => setSurveyTypeFilter(e.target.value)}
-                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer w-[150px]"
-              >
-                <option value="all">All Types</option>
-                <option value="BH">Boreholes (BH)</option>
-                <option value="CPT">CPTs</option>
-                <option value="PLT">PLTs</option>
-              </select>
-              <select 
-                value={surveyFilter}
-                onChange={e => setSurveyFilter(e.target.value)}
-                className="bg-surface-container-high text-primary text-sm border border-outline-variant/20 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors cursor-pointer w-[180px]"
-              >
-                <option value="all">All Statuses ({allSitePoints.length})</option>
-                <option value="unmarked">Unmarked ({allSitePoints.filter(p=>p.surveyStatus==='unmarked').length})</option>
-                <option value="marked">Marked ({allSitePoints.filter(p=>p.surveyStatus==='marked').length})</option>
-                <option value="cancelled">Cancelled ({allSitePoints.filter(p=>p.surveyStatus==='cancelled').length})</option>
-              </select>
-
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={downloadSurveyTemplate}
-                  className="bg-surface-container-high hover:bg-surface-container-highest text-primary border border-outline-variant/20 px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all"
-                  title="Download CSV Template with IDs"
-                >
-                  <span className="material-symbols-outlined text-sm">download</span> Template
-                </button>
-                <label className="bg-secondary text-on-secondary px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2 cursor-pointer hover:brightness-110 transition-all shadow-lg active:scale-95">
-                  <span className="material-symbols-outlined text-sm">upload</span> Upload Survey
-                  <input type="file" accept=".csv" className="hidden" onChange={handleSurveyUpload} />
-                </label>
+        <div className="bg-surface-container-low rounded-3xl border border-white/5 shadow-2xl flex flex-col h-[75vh] overflow-hidden">
+           <div className="p-8 flex flex-col h-full min-h-0">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-3"><span className="material-symbols-outlined text-secondary">radar</span> Survey Progress Matrix</h2>
+                  <p className="text-[10px] text-on-primary-container/40 uppercase tracking-widest font-bold mt-1">Live Coordination with Site Marking Teams</p>
+                </div>
+                <div className="flex items-center gap-3">
+                   <button onClick={() => {}} className="bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-white/5 transition-all">Download Template</button>
+                   <label className="bg-secondary text-white px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-lg">
+                      Upload Actuals (CSV)
+                      <input type="file" className="hidden" accept=".csv" onChange={handleSurveyUpload} />
+                   </label>
+                </div>
               </div>
-            </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest relative custom-scrollbar">
-              <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 bg-surface-container-high z-10 border-b border-outline-variant/20">
-                  <tr>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Point ID</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Type</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Section</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Proposed (E, N)</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-secondary">Actual E</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-secondary">Actual N</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label">Elev. (m)</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-tertiary">Delta (m)</th>
-                    <th className="p-3 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant font-label text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {surveyList.map((pt, i) => (
-                    <tr key={pt.id} className={`border-b border-outline-variant/5 text-sm hover:bg-surface-container transition-colors ${i % 2 === 0 ? 'bg-surface-container-lowest/30' : ''}`}>
-                      <td className="p-3 font-bold text-primary">{pt.id}</td>
-                      <td className="p-3 text-on-surface-variant font-mono">{pt.type}</td>
-                      <td className="p-3 text-on-surface-variant">{pt.section}</td>
-                      <td className="p-3 text-on-surface-variant font-mono text-[10px]">{pt.easting.toFixed(4)},<br/>{pt.northing.toFixed(4)}</td>
-                      <td className="p-3">
-                        <input 
-                          type="number" 
-                          step="0.0001"
-                          value={pt.actualEasting ?? ''}
-                          onChange={(e) => handleActualCoordChange(pt.id, 'actualEasting', e.target.value)}
-                          placeholder="E..."
-                          className="w-24 bg-surface-container-high text-secondary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-secondary transition-colors"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input 
-                          type="number" 
-                          step="0.0001"
-                          value={pt.actualNorthing ?? ''}
-                          onChange={(e) => handleActualCoordChange(pt.id, 'actualNorthing', e.target.value)}
-                          placeholder="N..."
-                          className="w-24 bg-surface-container-high text-secondary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-secondary transition-colors"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input 
-                          type="number" 
-                          step="0.0001"
-                          value={pt.elevation || ''}
-                          onChange={(e) => handleElevationChange(pt.id, e.target.value)}
-                          placeholder="0.0"
-                          className="w-16 bg-surface-container-high text-primary font-mono text-xs px-2 py-1 rounded border border-outline-variant/20 focus:outline-none focus:border-tertiary transition-colors"
-                        />
-                      </td>
-                      <td className="p-3 font-mono text-xs font-bold">
-                        {calculateDelta(pt) ? (
-                          <span className={`${parseFloat(calculateDelta(pt)!) > 0.5 ? 'text-error' : 'text-tertiary'}`}>
-                            {calculateDelta(pt)}m
-                          </span>
-                        ) : '--'}
-                      </td>
-                      <td className="p-3 text-center">
-                        <select 
-                          value={pt.surveyStatus}
-                          onChange={(e) => handleStatusChange(pt.id, e.target.value as any)}
-                          className={`text-xs font-bold uppercase tracking-widest px-2 py-1 rounded outline-none border border-transparent transition-colors cursor-pointer ${
-                            pt.surveyStatus === 'marked' ? 'bg-tertiary/20 text-tertiary hover:border-tertiary/40' :
-                            pt.surveyStatus === 'cancelled' ? 'bg-error/20 text-error hover:border-error/40' :
-                            'bg-surface-container-highest text-on-surface-variant hover:border-outline-variant/40'
-                          }`}
-                        >
-                          <option value="unmarked">UNM</option>
-                          <option value="marked">MRK</option>
-                          <option value="cancelled">CAN</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                  {surveyList.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="p-8 text-center text-on-surface-variant text-sm">No points match the filter criteria.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+              <div className="flex items-center gap-4 mb-6">
+                 <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/20 text-sm">search</span>
+                    <input value={surveySearch} onChange={e => setSurveySearch(e.target.value)} placeholder="Search Point ID..." className="w-full bg-surface-container-highest border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:ring-1 focus:ring-secondary focus:outline-none" />
+                 </div>
+                 <select value={surveyFilter} onChange={e => setSurveyFilter(e.target.value)} className="bg-surface-container-highest border border-white/5 text-xs font-bold uppercase tracking-widest px-4 py-2.5 rounded-xl focus:outline-none focus:border-secondary">
+                    <option value="all">All Statuses</option>
+                    <option value="unmarked">Unmarked</option>
+                    <option value="marked">Marked</option>
+                    <option value="cancelled">Cancelled</option>
+                 </select>
+              </div>
 
-          </div>
+              <div className="flex-1 overflow-auto rounded-2xl border border-white/5 bg-black/20 custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-surface-container-high z-10 border-b border-white/10">
+                    <tr className="text-[9px] uppercase tracking-[0.2em] font-bold text-on-primary-container/40">
+                      <th className="p-4">Point ID</th>
+                      <th className="p-4">Type</th>
+                      <th className="p-4">Proposed (E, N)</th>
+                      <th className="p-4 text-secondary">Actual E</th>
+                      <th className="p-4 text-secondary">Actual N</th>
+                      <th className="p-4">Elev. (m)</th>
+                      <th className="p-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[11px] font-mono">
+                    {surveyList.map((pt) => (
+                      <tr key={pt.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="p-4 font-bold text-primary">{pt.id}</td>
+                        <td className="p-4 opacity-40">{pt.type}</td>
+                        <td className="p-4 opacity-40 leading-tight">{pt.easting.toFixed(3)},<br/>{pt.northing.toFixed(3)}</td>
+                        <td className="p-4"><input className="bg-surface-container-high border border-white/5 rounded px-2 py-1 w-24 focus:outline-none focus:border-secondary font-bold text-secondary" value={pt.actualEasting || ''} onChange={e => handleSurveyCoordChange(pt.id, 'actualEasting', e.target.value)} /></td>
+                        <td className="p-4"><input className="bg-surface-container-high border border-white/5 rounded px-2 py-1 w-24 focus:outline-none focus:border-secondary font-bold text-secondary" value={pt.actualNorthing || ''} onChange={e => handleSurveyCoordChange(pt.id, 'actualNorthing', e.target.value)} /></td>
+                        <td className="p-4"><input className="bg-surface-container-high border border-white/5 rounded px-2 py-1 w-16 focus:outline-none focus:border-primary font-bold text-primary" value={pt.elevation || ''} onChange={e => handleSurveyCoordChange(pt.id, 'elevation', e.target.value)} /></td>
+                        <td className="p-4 text-center">
+                          <select value={pt.surveyStatus} onChange={e => handleStatusChange(pt.id, e.target.value as any)} className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded border transition-all ${pt.surveyStatus === 'marked' ? 'bg-secondary/20 border-secondary text-secondary' : pt.surveyStatus === 'cancelled' ? 'bg-error/20 border-error text-error' : 'bg-white/5 border-white/10 text-white/40'}`}>
+                             <option value="unmarked">UNM</option>
+                             <option value="marked">MRK</option>
+                             <option value="cancelled">CAN</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+           </div>
         </div>
       )}
 
+      {/* --- AI TAB CONTENT --- */}
+      {activeTab === 'ai' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+           <div className="bg-surface-container-low rounded-3xl border border-white/5 overflow-hidden relative p-8 shadow-xl">
+              <div className="absolute top-0 left-0 w-full h-1 bg-tertiary"></div>
+              <h2 className="text-xl font-bold flex items-center gap-3 mb-8"><span className="material-symbols-outlined text-tertiary">auto_fix_high</span> Legacy PDF Reconstruction</h2>
+              
+              <div className="space-y-6">
+                <div>
+                   <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-2">Target Point ID</label>
+                   <select value={selectedPointId} onChange={e => setSelectedPointId(e.target.value)} className="w-full bg-surface-container-high border border-white/5 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:border-tertiary">
+                      {filteredPoints.map(p => <option key={p.id} value={p.id}>{p.id} ({p.section})</option>)}
+                   </select>
+                </div>
+
+                <div 
+                  className={`border-2 border-dashed rounded-3xl flex flex-col items-center justify-center p-12 transition-all ${dragActive ? 'border-tertiary bg-tertiary/5 scale-[1.02]' : 'border-white/5 bg-black/20 hover:border-tertiary/40'}`}
+                  onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleAIDrop}
+                >
+                  <span className="material-symbols-outlined text-4xl text-tertiary mb-4">picture_as_pdf</span>
+                  <p className="text-xs font-bold uppercase tracking-widest text-center mb-6 opacity-40">Drag PDF Log for {selectedPointId} here</p>
+                  <label className="bg-tertiary text-white px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-tighter cursor-pointer hover:brightness-110 active:scale-95 transition-all">Browse PDF Logs</label>
+                </div>
+              </div>
+           </div>
+
+           <div className="flex flex-col gap-8">
+              <div className="bg-surface-container-low rounded-3xl border border-white/5 p-8 relative overflow-hidden flex-1 shadow-xl">
+                <div className="absolute top-0 left-0 w-full h-1 bg-secondary"></div>
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-secondary">database</span> Record Archive</h3>
+                <p className="text-xs opacity-40 mb-6 leading-relaxed">Download currently synchronized geotechnical parameters for {selectedPointId} to XLSX before performing an override.</p>
+                <button onClick={downloadOriginalData} className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 text-xs font-bold uppercase tracking-widest transition-all">Download Original Profile</button>
+              </div>
+
+              <div className="bg-surface-container-low rounded-3xl border border-white/5 p-8 relative overflow-hidden shadow-xl">
+                 <div className="absolute top-0 left-0 w-full h-1 bg-error"></div>
+                 <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-error"><span className="material-symbols-outlined">gavel</span> Compliance & Audit</h3>
+                 <div className="p-4 bg-error/10 border border-error/20 rounded-2xl">
+                    <p className="text-[10px] font-bold leading-relaxed">System logs all depth overrides. Any deviation from the proposed +-{0.5}m threshold triggers an automatic inspector notification.</p>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   )
 }

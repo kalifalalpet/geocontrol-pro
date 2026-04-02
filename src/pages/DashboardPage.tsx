@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, GeoJSON, Tooltip } from 'react-leaflet'
-import { Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import L from 'leaflet'
 import { allSitePoints, boreholePoints, cptPoints, pltPoints, mapCenter, kpiData, soilStrata, sections, sectionPolygons, type SitePoint } from '../data/sampleData'
 import { useResource } from '../context/ResourceContext'
+import { useProjects } from '../context/ProjectContext'
+import ExportCenter from '../components/ExportCenter'
+import { exportToCSV, exportToPDF } from '../utils/exportUtils'
 
 // ═══ COMMON STYLES ═══
 const labelStyle = `
@@ -153,6 +156,7 @@ function MapClickHandler({ clearSelection }: { clearSelection: () => void }) {
 
 export default function DashboardPage() {
   const { assets } = useResource()
+  const { activeProject } = useProjects()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showLayers, setShowLayers] = useState({ BH: true, CPT: true, PLT: true, assets: true })
   
@@ -163,6 +167,7 @@ export default function DashboardPage() {
   const [coordSystem, setCoordSystem] = useState<'UTM37N' | 'WGS84'>('UTM37N')
   const [zoomLevel, setZoomLevel] = useState(14)
   const [surveyMode, setSurveyMode] = useState(false)
+  const [showExport, setShowExport] = useState(false)
 
   const toggleSection = (section: string) => {
     const newSecs = new Set(activeSections)
@@ -188,47 +193,53 @@ export default function DashboardPage() {
     return null
   }, [selectedIds])
 
-  const filteredPoints = useMemo(() => {
-    let pts: SitePoint[] = []
-    if (showLayers.BH) pts = [...pts, ...boreholePoints]
-    if (showLayers.CPT) pts = [...pts, ...cptPoints]
-    if (showLayers.PLT) pts = [...pts, ...pltPoints]
-    pts = pts.filter(p => activeSections.has(p.section))
-    return pts
-  }, [showLayers, activeSections])
+  // Points filtering logic moved to useMemo(counts)
 
   const counts = useMemo(() => {
-    const bh = filteredPoints.filter(p => p.type === 'BH')
-    const cpt = filteredPoints.filter(p => p.type === 'CPT')
-    const plt = filteredPoints.filter(p => p.type === 'PLT')
+    const isQiddiya = activeProject?.id === 'qiddiya-coastal'
+    const pts = isQiddiya ? allSitePoints : []
+    
+    const bh = pts.filter(p => p.type === 'BH')
+    const cpt = pts.filter(p => p.type === 'CPT')
+    const plt = pts.filter(p => p.type === 'PLT')
     
     return {
+      points: pts,
       bh: bh.length,
       bhCompleted: bh.filter(p => p.status === 'completed').length,
       cpt: cpt.length,
       cptCompleted: cpt.filter(p => p.status === 'completed').length,
       plt: plt.length,
       pltCompleted: plt.filter(p => p.status === 'completed').length,
-      metersPlanned: kpiData.totalMetersDrilled,
-      metersCompleted: filteredPoints.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.targetDepth, 0)
+      metersPlanned: activeProject?.metersPlanned || 0,
+      metersCompleted: activeProject?.metersCompleted || pts.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.targetDepth, 0)
     }
-  }, [filteredPoints])
+  }, [activeProject])
+
+  // Points for Map/Sidebar
+  const [filteredPoints, setFilteredPoints] = useState<SitePoint[]>(counts.points)
+  useEffect(() => {
+    setFilteredPoints(counts.points)
+  }, [counts.points])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* KPI Header */}
       <section className="grid grid-cols-5 gap-3 px-6 py-4 bg-surface-container-lowest shrink-0">
+        {/* Drilling Progress (First) */}
         <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
-          <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Total Meters</p>
-          <div>
-            <h2 className="text-2xl font-headline font-bold text-primary">{counts.metersPlanned.toLocaleString()}<span className="text-sm font-normal ml-1">m</span></h2>
-            <p className="text-[10px] mt-1 space-x-1">
-              <span className="font-bold text-tertiary">{counts.metersCompleted.toLocaleString()}m completed</span>
-              <span className="text-on-surface-variant font-medium">•</span>
-              <span className="font-bold text-on-surface-variant">{(counts.metersPlanned - counts.metersCompleted).toLocaleString()}m remaining</span>
-            </p>
+          <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Drilling Progress (M)</p>
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between items-baseline">
+               <h2 className="text-2xl font-headline font-bold text-secondary">{counts.metersCompleted.toLocaleString()}m</h2>
+               <span className="text-[10px] font-bold text-on-primary-container/40">/{counts.metersPlanned > 0 ? counts.metersPlanned.toLocaleString() : '---'}m</span>
+            </div>
+            <div className="mt-1 w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden shadow-inner">
+               <div className="h-full bg-secondary shadow-[0_0_8px_rgba(255,185,95,0.4)] transition-all duration-1000" style={{ width: `${counts.metersPlanned > 0 ? Math.min(100, (counts.metersCompleted / counts.metersPlanned) * 100) : 0}%` }}></div>
+            </div>
           </div>
         </div>
+
         <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Boreholes</p>
           <div>
@@ -243,6 +254,7 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
+
         <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">CPT Tests</p>
           <div>
@@ -257,6 +269,7 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
+
         <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
           <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">PLT Tests</p>
           <div>
@@ -268,20 +281,26 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
+
+        {/* Project Budget (Last) */}
         <div className="bg-surface-container-high p-4 rounded-xl border-t border-white/5 flex flex-col justify-between">
-          <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Budget Efficiency</p>
-          <h2 className="text-2xl font-headline font-bold text-primary">{kpiData.budgetEfficiency}%</h2>
-          <div className="mt-1 w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
-            <div className="h-full bg-secondary" style={{ width: `${kpiData.budgetEfficiency}%` }}></div>
+          <p className="text-[10px] font-label font-bold uppercase tracking-widest text-on-primary-container mb-1">Project Budget (SAR)</p>
+          <div>
+            <h2 className="text-2xl font-headline font-bold text-primary">{(activeProject?.budgetSAR || 0).toLocaleString()}</h2>
+            <p className="text-[10px] mt-1 space-x-1">
+              <span className="font-bold text-tertiary">{(activeProject?.spentSAR || 0).toLocaleString()} spent</span>
+              <span className="text-on-surface-variant font-medium">•</span>
+              <span className="font-bold text-on-surface-variant">{((activeProject?.budgetSAR || 0) - (activeProject?.spentSAR || 0)).toLocaleString()} remaining</span>
+            </p>
           </div>
         </div>
       </section>
 
       {/* Map + Sidebar */}
-      <div className={`flex-1 flex overflow-hidden relative zoom-${Math.floor(zoomLevel)}`}>
+      <div className={`flex-1 flex overflow-hidden relative min-h-0 zoom-${Math.floor(zoomLevel)}`}>
         <style>{labelStyle}</style>
         {/* Map */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-h-0">
           <MapContainer center={mapCenter} zoom={14} className="h-full w-full" zoomControl={false}>
             <ZoomListener onZoom={setZoomLevel} />
             <MapClickHandler clearSelection={() => setSelectedIds(new Set())} />
@@ -309,7 +328,7 @@ export default function DashboardPage() {
                 key={pt.id}
                 position={[pt.lat, pt.lng]}
                 icon={getIcon(pt, selectedIds.has(pt.id), surveyMode)}
-                eventHandlers={{ click: (e) => handleMarkerClick(e, pt.id) }}
+                eventHandlers={{ click: (e: any) => handleMarkerClick(e, pt.id) }}
               >
                 {showLabels && (
                   <Tooltip permanent direction="top" className={`custom-marker-label label-color-${pt.type}`}>
@@ -381,6 +400,14 @@ export default function DashboardPage() {
                 <span className="text-[9px] font-bold uppercase">Marker IDs</span>
               </button>
             </div>
+
+            <button
+              onClick={() => setShowExport(!showExport)}
+              className={`w-full flex items-center justify-center gap-3 py-2.5 rounded-xl border transition-all duration-300 font-bold uppercase tracking-widest text-[10px] ${showExport ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(100,161,238,0.3)]' : 'bg-surface-container-highest text-primary border-outline-variant/10 hover:bg-surface-bright shadow-sm'}`}
+            >
+              <span className="material-symbols-outlined text-sm">download</span>
+              Export Site Data
+            </button>
 
             <div className="border-t border-white/5 my-1"></div>
 
@@ -462,6 +489,17 @@ export default function DashboardPage() {
             
           </div>
 
+          {/* Export Center Overlay */}
+          {showExport && (
+            <div className="absolute bottom-6 left-[250px] z-[2000]">
+              <ExportCenter 
+                filteredPoints={filteredPoints} 
+                activeSections={activeSections} 
+                onClose={() => setShowExport(false)} 
+              />
+            </div>
+          )}
+
           {/* Legend */}
           <div className="absolute top-4 right-4 glass-panel rounded-lg px-4 py-3 border border-white/5 z-[1000] flex items-center gap-5">
             <span className="text-[9px] font-bold uppercase tracking-widest text-on-primary-container">Legend</span>
@@ -526,17 +564,24 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              <div className="mt-4 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <p className="text-[10px] text-on-primary-container/40 uppercase font-bold tracking-widest mb-1">Financial Allocation</p>
+                <div className="flex justify-between items-center">
+                   <span className="text-xs font-bold text-white">Estimated Cost</span>
+                   <span className="text-sm font-bold text-primary">{(selected.targetDepth * 450).toLocaleString()} SAR</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
               {/* Tests */}
               <div>
-                <p className="text-[10px] text-on-primary-container uppercase font-bold tracking-widest mb-3">Required Tests</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {selected.tests.map(t => (
-                    <span key={t.name} className="px-2 py-0.5 text-[10px] font-bold bg-surface-container-high text-primary rounded border border-outline-variant/20">{t.count}x {t.name}</span>
-                  ))}
-                </div>
+                  <p className="text-[10px] text-on-primary-container uppercase font-bold tracking-widest mb-3">Required Tests</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selected.tests.map((t: any) => (
+                      <span key={t.name} className="px-2 py-0.5 text-[10px] font-bold bg-surface-container-high text-primary rounded border border-outline-variant/20">{t.count}x {t.name}</span>
+                    ))}
+                  </div>
               </div>
 
               {/* Soil Strata (for BH only) */}
@@ -609,9 +654,12 @@ export default function DashboardPage() {
                 View Full Data
               </Link>
               <div className="grid grid-cols-2 gap-3">
-                <button className="py-3 bg-surface-container-high border border-outline-variant/20 rounded-lg text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-surface-bright transition-colors flex items-center justify-center gap-1">
+                <button 
+                  onClick={() => selected && exportToCSV([selected])}
+                  className="py-3 bg-surface-container-high border border-outline-variant/20 rounded-lg text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-surface-bright transition-colors flex items-center justify-center gap-1"
+                >
                   <span className="material-symbols-outlined text-xs">download</span>
-                  Export
+                  Export CSV
                 </button>
                 <button className="py-3 bg-surface-container-high border border-outline-variant/20 rounded-lg text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-surface-bright transition-colors flex items-center justify-center gap-1">
                   <span className="material-symbols-outlined text-xs">edit_note</span>
@@ -639,7 +687,7 @@ export default function DashboardPage() {
             
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
               <div className="space-y-2">
-                {Array.from(selectedIds).map(id => {
+                {Array.from(selectedIds).map((id: string) => {
                   const p = allSitePoints.find(x => x.id === id)
                   if (!p) return null
                   return (
@@ -664,6 +712,20 @@ export default function DashboardPage() {
                 <span className="material-symbols-outlined text-sm">multiline_chart</span>
                 View Data in Data Viewer
               </Link>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <button 
+                  onClick={() => exportToCSV(filteredPoints.filter(p => selectedIds.has(p.id)))}
+                  className="py-3 bg-surface-container-high border border-outline-variant/20 rounded-lg text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-surface-bright transition-colors flex items-center justify-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">csv</span> CSV
+                </button>
+                <button 
+                  onClick={() => exportToPDF(filteredPoints.filter(p => selectedIds.has(p.id)))}
+                  className="py-3 bg-surface-container-high border border-outline-variant/20 rounded-lg text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-surface-bright transition-colors flex items-center justify-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-xs">picture_as_pdf</span> PDF
+                </button>
+              </div>
             </div>
           </aside>
         )}
